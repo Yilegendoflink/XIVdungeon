@@ -709,7 +709,7 @@ export function generateFloor(seed: number, floorNumber = 1): FloorState {
     if (!specialPos) throw new Error('无法放置特殊敌人');
     const def = ENEMY_DEFS.morbol;
     const power = def.power * (isBoss ? 2 : 1);
-    const hp = isBoss ? def.hp * 2 : def.hp;
+    const hp = isBoss ? Math.round(def.hp * 1.5) : def.hp;
     enemies.push({
       id: nextId('enemy'),
       type: 'morbol',

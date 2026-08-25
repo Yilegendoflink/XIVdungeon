@@ -1,13 +1,14 @@
 import { BOSS_FLOOR_NUMBER } from '@/config';
 import type { GameState } from '@/game/state';
-import { isPassable } from '@/game/state';
+import { isPassable, mpRegenPerTurn } from '@/game/state';
 import type { PlayerAction } from '@/game/actions';
-import { applyFloorModifiers, heroOnExit } from '@/game/actions';
+import { applyFloorModifiers, applyLevelUpReward, heroOnExit } from '@/game/actions';
 import { computeFOV } from '@/world/fov';
 import { attackEnemy, BASIC_ATTACK_RANGE } from '@/systems/combat';
 import { processEnemyTurns } from '@/systems/ai';
 import { tickBuffs, tryPickup, useItem } from '@/systems/inventory';
 import { generateFloor } from '@/world/generate';
+import { useSkill } from '@/systems/skills';
 
 function enemyInDirection(state: GameState, dx: number, dy: number) {
   if (dx === 0 && dy === 0) return undefined;
@@ -23,6 +24,9 @@ function enemyInDirection(state: GameState, dx: number, dy: number) {
 }
 
 function applyPlayerAction(state: GameState, action: PlayerAction): GameState {
+  if (state.phase === 'levelUp') {
+    return action.type === 'chooseLevelReward' ? applyLevelUpReward(state, action.reward) : state;
+  }
   if (action.type === 'toggleInventory') {
     return {
       ...state,
@@ -44,6 +48,10 @@ function applyPlayerAction(state: GameState, action: PlayerAction): GameState {
 
   if (action.type === 'useItem') {
     return useItem(state, action.index);
+  }
+
+  if (action.type === 'useSkill') {
+    return useSkill(state, action.skillId, action);
   }
 
   if (action.type === 'attack') {
@@ -121,6 +129,8 @@ export function processTurn(state: GameState, action: PlayerAction): GameState {
     return applyPlayerAction(state, action);
   }
 
+  if (state.phase === 'levelUp') return applyPlayerAction(state, action);
+
   if (state.phase !== 'playing' && !(state.phase === 'inventory' && action.type === 'useItem')) {
     return state;
   }
@@ -130,14 +140,30 @@ export function processTurn(state: GameState, action: PlayerAction): GameState {
   if (s0 === state) return state;
 
   let s = s0;
-  if (s.phase === 'victory') return s;
+  if (s.phase === 'victory' || s.phase === 'levelUp') return s;
   const floorChanged = s.floor.number !== state.floor.number;
 
-  // Using an item from inventory still spends a turn
+  // Using an item or skill from the player action flow still spends a turn.
   s = tickBuffs(s);
+  if (action.type !== 'useSkill') {
+    s = {
+      ...s,
+      hero: {
+        ...s.hero,
+        skillCooldowns: { jump: Math.max(0, s.hero.skillCooldowns.jump - 1) },
+      },
+    };
+  }
   computeFOV(s.floor, s.hero.x, s.hero.y);
   if (floorChanged) return { ...s, turn: s.turn + 1 };
   s = processEnemyTurns(s);
+  s = {
+    ...s,
+    hero: {
+      ...s.hero,
+      mp: Math.min(s.hero.maxMp, s.hero.mp + mpRegenPerTurn(s.hero.attributes)),
+    },
+  };
   s = { ...s, turn: s.turn + 1 };
 
   if (s.hero.hp <= 0) {

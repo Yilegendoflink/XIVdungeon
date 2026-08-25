@@ -8,13 +8,19 @@ export const NORMAL_FLOOR_COUNT = 5;
 export const BOSS_FLOOR_NUMBER = NORMAL_FLOOR_COUNT + 1;
 
 export const INVENTORY_SIZE = 10;
-export const SAVE_VERSION = 8;
+export const MAX_ACTIVE_SKILLS = 5;
+export const MAX_LEVEL = 30;
+export const SAVE_VERSION = 10;
 export const SAVE_KEY = 'xiv-dungeon-save';
 export const DEFAULT_PLAYER_JOB = 'dragoon';
 export const PLAYER_ASSET_DIR = `${import.meta.env.BASE_URL}assets/player/`;
 
 export function playerTexturePath(job = DEFAULT_PLAYER_JOB): string {
   return `${PLAYER_ASSET_DIR}${job}.png`;
+}
+
+export function skillIconPath(skillId: string): string {
+  return `${import.meta.env.BASE_URL}assets/skills/${skillId}.png`;
 }
 
 export type TileKind = 'wall' | 'floor' | 'entrance' | 'exit';

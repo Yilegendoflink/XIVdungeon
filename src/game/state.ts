@@ -1,12 +1,29 @@
-import { MAP_W, MAP_H } from '@/config';
+import { MAP_W, MAP_H, MAX_LEVEL } from '@/config';
 import type { TileKind, VisibilityKind } from '@/config';
 
-export type GamePhase = 'title' | 'playing' | 'inventory' | 'dead' | 'victory';
+export type GamePhase = 'title' | 'playing' | 'inventory' | 'levelUp' | 'dead' | 'victory';
 export type EnemyType = 'bomb' | 'cactuar' | 'morbol';
 export type EnemyAiType = 'standard' | 'neutral' | 'stationary' | 'patrol' | 'boss';
 export type EnemyAiState = 'free' | 'aggro';
 export type ItemType = 'hiPotion' | 'scrollOfMight' | 'gridanianRation';
 export type FloorObjectiveType = 'findExit' | 'defeatCount' | 'defeatSpecial' | 'finalBoss';
+export type BaseAttribute = 'strength' | 'dexterity' | 'intelligence';
+export type SkillId = 'jump';
+export type LevelUpRewardId = 'attack' | 'survival' | 'critical';
+
+export const LEVEL_UP_REWARD_IDS: LevelUpRewardId[] = ['attack', 'survival', 'critical'];
+
+export interface StaticAttributes {
+  strength: number;
+  dexterity: number;
+  intelligence: number;
+  mind: number;
+  tenacity: number;
+  piety: number;
+  determination: number;
+  directHit: number;
+  criticalHit: number;
+}
 
 export interface GameModifiers {
   infiniteHp: boolean;
@@ -102,7 +119,10 @@ export interface HeroState {
   maxMp: number;
   jobResources: JobResourceState[];
   gil: number;
-  atk: number;
+  level: number;
+  experience: number;
+  attributes: StaticAttributes;
+  skillCooldowns: Record<SkillId, number>;
   def: number;
   inventory: ItemState[];
   buffs: BuffState[];
@@ -145,6 +165,8 @@ export interface GameState {
   floor: FloorState;
   damageEventSequence: number;
   damageEvents: DamageEvent[];
+  levelUpRewards: LevelUpRewardId[];
+  pendingLevelRewards: number;
   log: LogEntry[];
   stats: RunStats;
 }
@@ -162,9 +184,57 @@ export function isPassable(floor: FloorState, x: number, y: number): boolean {
   return floor.tiles[idx(x, y, floor.width)] !== 'wall';
 }
 
-export function heroAtk(hero: HeroState): number {
+export function heroAtk(hero: HeroState, primaryAttribute: BaseAttribute): number {
   const bonus = hero.buffs.reduce((sum, b) => sum + (b.type === 'might' ? b.value : 0), 0);
-  return hero.atk + bonus;
+  return Math.floor(hero.attributes[primaryAttribute] / 2) + bonus;
+}
+
+export function experienceRequiredForLevel(level: number): number {
+  return level >= MAX_LEVEL ? 0 : 10 * level * level;
+}
+
+export function gainExperience(hero: HeroState, amount: number): { hero: HeroState; levelsGained: number } {
+  let level = hero.level;
+  let experience = hero.experience + amount;
+  let maxHp = hero.maxHp;
+  let levelsGained = 0;
+  while (level < MAX_LEVEL && experience >= experienceRequiredForLevel(level)) {
+    experience -= experienceRequiredForLevel(level);
+    level += 1;
+    maxHp = Math.ceil(maxHp * 1.1);
+    levelsGained += 1;
+  }
+  return {
+    hero: {
+      ...hero,
+      level,
+      experience: level === MAX_LEVEL ? 0 : experience,
+      maxHp,
+      mp: levelsGained > 0 ? hero.maxMp : hero.mp,
+    },
+    levelsGained,
+  };
+}
+
+export function rollLevelUpRewards(): LevelUpRewardId[] {
+  const rewards = [...LEVEL_UP_REWARD_IDS];
+  for (let index = rewards.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [rewards[index], rewards[swapIndex]] = [rewards[swapIndex]!, rewards[index]!];
+  }
+  return rewards;
+}
+
+export function maxHpForAttributes(attributes: StaticAttributes): number {
+  return 20 + Math.floor(attributes.tenacity / 10);
+}
+
+export function mpRegenPerTurn(attributes: StaticAttributes): number {
+  return 1 + Math.floor(attributes.piety / 100);
+}
+
+export function mpCostAfterPiety(cost: number, attributes: StaticAttributes): number {
+  return Math.max(1, Math.ceil(cost * (1 - Math.min(0.5, attributes.piety / 1000))));
 }
 
 export function enemyName(type: EnemyType): string {

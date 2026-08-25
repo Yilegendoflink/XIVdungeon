@@ -23,7 +23,7 @@ describe('save/load', () => {
     saveGame(state);
     const loaded = loadGame();
     expect(loaded?.seed).toBe(99);
-    expect(loaded?.hero.hp).toBe(20);
+    expect(loaded?.hero.hp).toBe(25);
     expect(loaded?.floor.tiles).toHaveLength(32 * 32);
   });
 
@@ -41,5 +41,17 @@ describe('save/load', () => {
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify({ version: 1, savedAt: 1, state: malformed }));
     expect(loadGame()).toBeNull();
+  });
+
+  it('migrates version 6 saves to the progression model', () => {
+    const state = createNewGame(12);
+    const { level: _level, experience: _experience, attributes: _attributes, ...legacyHero } = state.hero;
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      version: 6,
+      savedAt: 1,
+      state: { ...state, version: 6, hero: { ...legacyHero, atk: 5 } },
+    }));
+
+    expect(loadGame()?.hero).toMatchObject({ level: 1, experience: 0, attributes: { strength: 12 } });
   });
 });

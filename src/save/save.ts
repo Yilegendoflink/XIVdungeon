@@ -1,9 +1,9 @@
-import { BOSS_FLOOR_NUMBER, MAP_H, MAP_W, SAVE_KEY, SAVE_VERSION } from '@/config';
+import { BOSS_FLOOR_NUMBER, MAP_H, MAP_W, MAX_LEVEL, SAVE_KEY, SAVE_VERSION } from '@/config';
 import { ENEMY_DEFS } from '@/data/enemies';
 import { getJobDefinition } from '@/data/jobs';
 import type { TileKind, VisibilityKind } from '@/config';
 import { generateMapLayout, mapTemplateForObjective } from '@/world/generate';
-import type { EnemyAiState, EnemyAiType, EnemyType, FloorObjectiveType, GamePhase, GameState, ItemType } from '@/game/state';
+import { experienceRequiredForLevel, type EnemyAiState, type EnemyAiType, type EnemyType, type FloorObjectiveType, type GamePhase, type GameState, type ItemType, type LevelUpRewardId, type SkillId } from '@/game/state';
 
 interface SaveBlob {
   version: number;
@@ -11,7 +11,9 @@ interface SaveBlob {
   state: GameState;
 }
 
-const PHASES: GamePhase[] = ['title', 'playing', 'inventory', 'dead', 'victory'];
+const PHASES: GamePhase[] = ['title', 'playing', 'inventory', 'levelUp', 'dead', 'victory'];
+const LEVEL_UP_REWARDS: LevelUpRewardId[] = ['attack', 'survival', 'critical'];
+const SKILL_IDS: SkillId[] = ['jump'];
 const ENEMY_TYPES: EnemyType[] = ['bomb', 'cactuar', 'morbol'];
 const ENEMY_AI_TYPES: EnemyAiType[] = ['standard', 'neutral', 'stationary', 'patrol', 'boss'];
 const ENEMY_AI_STATES: EnemyAiState[] = ['free', 'aggro'];
@@ -192,6 +194,29 @@ function isValidJobResource(value: unknown): boolean {
   );
 }
 
+function isValidAttributes(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return [
+    value.strength,
+    value.dexterity,
+    value.intelligence,
+    value.mind,
+    value.tenacity,
+    value.piety,
+    value.determination,
+    value.directHit,
+    value.criticalHit,
+  ].every(isNonNegativeInteger);
+}
+
+function isLevelUpReward(value: unknown): value is LevelUpRewardId {
+  return typeof value === 'string' && LEVEL_UP_REWARDS.includes(value as LevelUpRewardId);
+}
+
+function isValidSkillCooldowns(value: unknown): boolean {
+  return isRecord(value) && SKILL_IDS.every((skillId) => isNonNegativeInteger(value[skillId]));
+}
+
 function isValidLogEntry(value: unknown): boolean {
   if (!isRecord(value)) return false;
   return typeof value.text === 'string' && isNonNegativeInteger(value.turn);
@@ -206,6 +231,15 @@ function isValidState(state: unknown): state is GameState {
     !isNonNegativeInteger(state.damageEventSequence) ||
     !Array.isArray(state.damageEvents) ||
     !state.damageEvents.every(isValidDamageEvent)
+  ) return false;
+  if (
+    !isNonNegativeInteger(state.pendingLevelRewards) ||
+    !Array.isArray(state.levelUpRewards) ||
+    !state.levelUpRewards.every(isLevelUpReward) ||
+    new Set(state.levelUpRewards).size !== state.levelUpRewards.length ||
+    (state.phase === 'levelUp'
+      ? (state.pendingLevelRewards < 1 || state.levelUpRewards.length !== 3)
+      : (state.pendingLevelRewards !== 0 || state.levelUpRewards.length !== 0))
   ) return false;
 
   const floor = state.floor;
@@ -265,7 +299,13 @@ function isValidState(state: unknown): state is GameState {
     !Array.isArray(hero.jobResources) ||
     !hero.jobResources.every(isValidJobResource) ||
     !isNonNegativeInteger(hero.gil) ||
-    !isFiniteNumber(hero.atk) ||
+    !isInteger(hero.level) ||
+    hero.level < 1 ||
+    hero.level > MAX_LEVEL ||
+    !isNonNegativeInteger(hero.experience) ||
+    (hero.level === MAX_LEVEL ? hero.experience !== 0 : hero.experience >= experienceRequiredForLevel(hero.level)) ||
+    !isValidAttributes(hero.attributes) ||
+    !isValidSkillCooldowns(hero.skillCooldowns) ||
     !isFiniteNumber(hero.def) ||
     !Array.isArray(hero.inventory) ||
     !hero.inventory.every(isValidItem) ||
@@ -288,7 +328,7 @@ function isValidState(state: unknown): state is GameState {
 function migrateSave(value: unknown): unknown {
   if (
     !isRecord(value) ||
-    ![SAVE_VERSION - 2, SAVE_VERSION - 1].includes(value.version as number) ||
+    ![SAVE_VERSION - 4, SAVE_VERSION - 3, SAVE_VERSION - 2, SAVE_VERSION - 1].includes(value.version as number) ||
     !isRecord(value.state) ||
     !isRecord(value.state.hero) ||
     !isRecord(value.state.floor)
@@ -297,6 +337,7 @@ function migrateSave(value: unknown): unknown {
   }
   const job = typeof value.state.hero.jobId === 'string' ? getJobDefinition(value.state.hero.jobId) : undefined;
   if (!job) return value;
+  const legacyVersion = value.version as number;
   const oldState = value.state;
   const oldHero = oldState.hero as Record<string, unknown>;
   const oldFloor = oldState.floor as Record<string, unknown>;
@@ -340,13 +381,17 @@ function migrateSave(value: unknown): unknown {
     state: {
       ...oldState,
       version: SAVE_VERSION,
+      phase: oldState.phase === 'levelUp' ? 'playing' : oldState.phase,
       hero: {
         ...oldHero,
-        ...(value.version === SAVE_VERSION - 2
+        ...(legacyVersion <= SAVE_VERSION - 2
           ? { level: 1, experience: 0, attributes: { ...job.attributes } }
           : {}),
+        skillCooldowns: { jump: 0 },
       },
       floor: { ...oldFloor, rooms, corridors, enemies },
+      levelUpRewards: [],
+      pendingLevelRewards: 0,
     },
   };
 }

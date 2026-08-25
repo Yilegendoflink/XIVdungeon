@@ -1,13 +1,63 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ENEMY_DEFS } from '@/data/enemies';
 import { createNewGame } from '@/game/actions';
-import { attackDistance, attackEnemy, attackHero, canBasicAttack, calcDamage } from '@/systems/combat';
+import {
+  attackDistance,
+  attackEnemy,
+  attackHero,
+  canBasicAttack,
+  calcDamage,
+  mitigateHeroDamage,
+  resolvePlayerDamage,
+} from '@/systems/combat';
 
 describe('calcDamage', () => {
   it('never returns less than 1', () => {
     for (let i = 0; i < 50; i++) {
       expect(calcDamage(1, 100)).toBeGreaterThanOrEqual(1);
     }
+  });
+
+  it('先扣除一半防御力，再加入 -1 到 1 的随机浮动', () => {
+    for (let i = 0; i < 100; i++) {
+      const damage = calcDamage(10, 4);
+      expect(damage).toBeGreaterThanOrEqual(7);
+      expect(damage).toBeLessThanOrEqual(9);
+    }
+  });
+});
+
+describe('属性伤害结算', () => {
+  it('按信念、直击、暴击的顺序结算，并允许同时触发', () => {
+    const state = createNewGame(7);
+    vi.spyOn(Math, 'random')
+      .mockReturnValueOnce(0.5)
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0);
+    const hero = {
+      ...state.hero,
+      attributes: {
+        ...state.hero.attributes,
+        strength: 20,
+        determination: 100,
+        directHit: 1000,
+        criticalHit: 1000,
+      },
+    };
+
+    expect(resolvePlayerDamage(hero, 0)).toEqual({ amount: 30, directHit: true, critical: true });
+    vi.restoreAllMocks();
+  });
+
+  it('坚韧减伤最高为 50%，并保留最低 1 点伤害', () => {
+    const state = createNewGame(7);
+    const hero = {
+      ...state.hero,
+      attributes: { ...state.hero.attributes, tenacity: 2000 },
+    };
+
+    expect(mitigateHeroDamage(100, hero)).toBe(50);
+    expect(mitigateHeroDamage(1, hero)).toBe(1);
   });
 });
 
@@ -181,6 +231,25 @@ describe('普通攻击范围', () => {
     expect(next.hero.gil).toBeGreaterThanOrEqual(reward.gil.min);
     expect(next.hero.gil).toBeLessThanOrEqual(reward.gil.max);
     expect(next.log[next.log.length - 1]?.text).toContain('获得');
+  });
+
+  it('升级时暂停战斗并提供三选一奖励', () => {
+    const state = createNewGame(7);
+    const enemy = state.floor.enemies[0]!;
+    const target = {
+      ...enemy,
+      type: 'morbol' as const,
+      x: state.hero.x + 1,
+      y: state.hero.y,
+      hp: 1,
+      maxHp: 1,
+      isSpecial: false,
+      isBoss: false,
+    };
+    const next = attackEnemy({ ...state, floor: { ...state.floor, enemies: [target] } }, target);
+
+    expect(next).toMatchObject({ phase: 'levelUp', pendingLevelRewards: 1 });
+    expect(new Set(next.levelUpRewards)).toEqual(new Set(['attack', 'survival', 'critical']));
   });
 
   it('Boss 击败奖励使用双倍区间', () => {

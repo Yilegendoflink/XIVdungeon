@@ -1,6 +1,7 @@
 import type { DamageEventKind, EnemyState, FloorState, GameState, HeroState } from '@/game/state';
-import { enemyName, heroAtk } from '@/game/state';
+import { enemyName, gainExperience, heroAtk, rollLevelUpRewards } from '@/game/state';
 import { ENEMY_DEFS } from '@/data/enemies';
+import { getJobDefinition } from '@/data/jobs';
 import { findTerrainPath } from '@/world/pathfinding';
 
 export const BASIC_ATTACK_RANGE = 2;
@@ -76,16 +77,39 @@ function updateObjectiveAfterKill(state: GameState, enemy: EnemyState): GameStat
   return next;
 }
 
+/** 基础伤害 = max(1, 攻击力 - floor(防御力 / 2) + [-1, 1] 随机浮动)。 */
 export function calcDamage(atk: number, def: number): number {
   return Math.max(1, atk - Math.floor(def / 2) + randInt(-1, 1));
 }
 
-export function attackEnemy(state: GameState, enemy: EnemyState): GameState {
-  if (!canBasicAttack(state.floor, state.hero, enemy)) return state;
+export interface PlayerDamageResult {
+  amount: number;
+  directHit: boolean;
+  critical: boolean;
+}
 
-  const dmg = state.modifiers.oneHitKill
-    ? enemy.hp
-    : calcDamage(heroAtk(state.hero), enemy.def);
+/**
+ * 玩家普通攻击按“信念 -> 直击 -> 暴击”顺序结算；直击和暴击可同时触发。
+ * 概率属性使用千分比，暴击倍率由暴击属性额外提高，最终伤害至少为 1。
+ */
+export function resolvePlayerDamage(hero: HeroState, defense: number, potency = 100): PlayerDamageResult {
+  const primaryAttribute = getJobDefinition(hero.jobId)?.primaryAttribute ?? 'strength';
+  let amount = calcDamage(heroAtk(hero, primaryAttribute) * (potency / 100), defense);
+  amount = Math.round(amount * (1 + hero.attributes.determination / 1000));
+  const directHit = Math.random() < Math.min(1, hero.attributes.directHit / 1000);
+  const critical = Math.random() < Math.min(1, hero.attributes.criticalHit / 1000);
+  if (directHit) amount = Math.round(amount * 1.4);
+  if (critical) amount = Math.round(amount * (1.5 + Math.min(0.5, hero.attributes.criticalHit / 2000)));
+  return { amount: Math.max(1, amount), directHit, critical };
+}
+
+/** 坚韧提供最高 50% 的敌方伤害减免，但不会让单次伤害低于 1。 */
+export function mitigateHeroDamage(amount: number, hero: HeroState): number {
+  return Math.max(1, Math.floor(amount * (1 - Math.min(0.5, hero.attributes.tenacity / 1000))));
+}
+
+export function damageEnemy(state: GameState, enemy: EnemyState, result: PlayerDamageResult): GameState {
+  const dmg = state.modifiers.oneHitKill ? enemy.hp : result.amount;
   const enemies = state.floor.enemies
     .map((e) => (e.id === enemy.id ? { ...e, hp: e.hp - dmg, aiState: 'aggro' as const } : e))
     .filter((e) => e.hp > 0);
@@ -93,7 +117,10 @@ export function attackEnemy(state: GameState, enemy: EnemyState): GameState {
   let s: GameState = {
     ...state,
     floor: { ...state.floor, enemies },
-    log: [...state.log, { turn: state.turn, text: `你攻击了${enemyName(enemy.type)}，造成 ${dmg} 点伤害。` }],
+    log: [...state.log, {
+      turn: state.turn,
+      text: `你攻击了${enemyName(enemy.type)}，造成 ${dmg} 点伤害。${result.directHit ? '直击！' : ''}${result.critical ? '暴击！' : ''}`,
+    }],
   };
   s = addDamageEvent(s, 'dealt', enemy.x, enemy.y, dmg);
 
@@ -105,22 +132,36 @@ export function attackEnemy(state: GameState, enemy: EnemyState): GameState {
       def.experience.max * rewardMultiplier,
     );
     const gil = randInt(def.gil.min * rewardMultiplier, def.gil.max * rewardMultiplier);
+    const progression = gainExperience(s.hero, experience);
     s = {
       ...s,
-      hero: { ...s.hero, gil: s.hero.gil + gil },
+      hero: { ...progression.hero, gil: s.hero.gil + gil },
       stats: { kills: s.stats.kills + 1, experience: s.stats.experience + experience },
       log: [...s.log, {
         turn: s.turn,
-        text: `${enemyName(enemy.type)} 被击败了！获得 ${experience} 点经验和 ${gil} Gil。`,
+        text: `${enemyName(enemy.type)} 被击败了！获得 ${experience} 点经验和 ${gil} Gil。${progression.levelsGained > 0 ? `升级至 ${progression.hero.level} 级！` : ''}`,
       }],
     };
     s = updateObjectiveAfterKill(s, enemy);
+    if (progression.levelsGained > 0 && s.phase !== 'victory') {
+      s = {
+        ...s,
+        phase: 'levelUp',
+        pendingLevelRewards: progression.levelsGained,
+        levelUpRewards: rollLevelUpRewards(),
+      };
+    }
   }
   return s;
 }
 
+export function attackEnemy(state: GameState, enemy: EnemyState): GameState {
+  if (!canBasicAttack(state.floor, state.hero, enemy)) return state;
+  return damageEnemy(state, enemy, resolvePlayerDamage(state.hero, enemy.def));
+}
+
 export function attackHero(state: GameState, enemy: EnemyState, ranged = false): GameState {
-  const dmg = calcDamage(enemy.atk, state.hero.def);
+  const dmg = mitigateHeroDamage(calcDamage(enemy.atk, state.hero.def), state.hero);
   const hero: HeroState = {
     ...state.hero,
     hp: state.modifiers.infiniteHp ? state.hero.maxHp : state.hero.hp - dmg,

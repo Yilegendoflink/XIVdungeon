@@ -40,7 +40,7 @@ describe('inventory', () => {
     state.hero.hp = 18;
     state.hero.inventory = [{ id: 'p', type: 'hiPotion' }];
     const next = useItem(state, 0);
-    expect(next.hero.hp).toBe(20);
+    expect(next.hero.hp).toBe(25);
   });
 
   it('might buff lasts 5 turns then expires', () => {

@@ -47,8 +47,8 @@ export const ENEMY_DEFS: Record<EnemyType, EnemyDef> = {
     power: 4,
     experience: { min: 12, max: 18 },
     gil: { min: 8, max: 14 },
-    hp: 30,
-    atk: 6,
+    hp: 24,
+    atk: 5,
     def: 2,
   },
 };

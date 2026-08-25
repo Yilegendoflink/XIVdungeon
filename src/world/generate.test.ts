@@ -110,5 +110,6 @@ describe('generateFloor', () => {
     expect(floor.objective.type).toBe('finalBoss');
     expect(floor.enemies.filter((enemy) => enemy.isBoss)).toHaveLength(1);
     expect(floor.enemies.filter((enemy) => enemy.isSpecial)).toHaveLength(1);
+    expect(floor.enemies.find((enemy) => enemy.isBoss)).toMatchObject({ hp: 36, maxHp: 36, atk: 7, def: 3 });
   });
 });
