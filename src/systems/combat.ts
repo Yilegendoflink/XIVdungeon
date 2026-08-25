@@ -1,12 +1,17 @@
-import type { EnemyState, GameState, HeroState } from '@/game/state';
+import type { EnemyState, FloorState, GameState, HeroState } from '@/game/state';
 import { enemyName, heroAtk } from '@/game/state';
+import { findTerrainPath } from '@/world/pathfinding';
 
 export const BASIC_ATTACK_RANGE = 2;
 
-export function canBasicAttack(hero: HeroState, enemy: EnemyState): boolean {
-  const dx = Math.abs(hero.x - enemy.x);
-  const dy = Math.abs(hero.y - enemy.y);
-  return Math.max(dx, dy) > 0 && Math.max(dx, dy) <= BASIC_ATTACK_RANGE;
+export function attackDistance(floor: FloorState, hero: HeroState, enemy: EnemyState): number | null {
+  const path = findTerrainPath(floor, hero.x, hero.y, enemy.x, enemy.y);
+  return path.length > 0 ? path.length : null;
+}
+
+export function canBasicAttack(floor: FloorState, hero: HeroState, enemy: EnemyState): boolean {
+  const distance = attackDistance(floor, hero, enemy);
+  return distance !== null && distance <= BASIC_ATTACK_RANGE;
 }
 
 function randInt(min: number, max: number): number {
@@ -57,7 +62,7 @@ export function calcDamage(atk: number, def: number): number {
 }
 
 export function attackEnemy(state: GameState, enemy: EnemyState): GameState {
-  if (!canBasicAttack(state.hero, enemy)) return state;
+  if (!canBasicAttack(state.floor, state.hero, enemy)) return state;
 
   const dmg = state.modifiers.oneHitKill
     ? enemy.hp

@@ -2,6 +2,69 @@ import { Path } from 'rot-js';
 import type { FloorState } from '@/game/state';
 import { isPassable } from '@/game/state';
 
+const GRID_DIRECTIONS = [
+  { x: 1, y: 0 },
+  { x: -1, y: 0 },
+  { x: 0, y: 1 },
+  { x: 0, y: -1 },
+  { x: 1, y: 1 },
+  { x: 1, y: -1 },
+  { x: -1, y: 1 },
+  { x: -1, y: -1 },
+];
+
+function canWalkGridStep(floor: FloorState, x: number, y: number, nx: number, ny: number): boolean {
+  if (!isPassable(floor, nx, ny)) return false;
+  const dx = nx - x;
+  const dy = ny - y;
+  if (dx === 0 || dy === 0) return true;
+  // Prevent diagonal movement through the corner of two blocking tiles.
+  return isPassable(floor, x + dx, y) && isPassable(floor, x, y + dy);
+}
+
+/** Shortest 8-direction terrain path. The target tile is allowed to contain an enemy. */
+export function findTerrainPath(
+  floor: FloorState,
+  x: number,
+  y: number,
+  tx: number,
+  ty: number,
+): { x: number; y: number }[] {
+  if (x === tx && y === ty) return [];
+  if (!isPassable(floor, x, y) || !isPassable(floor, tx, ty)) return [];
+
+  const startKey = `${x},${y}`;
+  const targetKey = `${tx},${ty}`;
+  const queue: { x: number; y: number }[] = [{ x, y }];
+  const parents = new Map<string, { x: number; y: number } | null>([[startKey, null]]);
+
+  for (let head = 0; head < queue.length; head++) {
+    const current = queue[head];
+    if (!current) break;
+    if (`${current.x},${current.y}` === targetKey) break;
+
+    for (const direction of GRID_DIRECTIONS) {
+      const next = { x: current.x + direction.x, y: current.y + direction.y };
+      const key = `${next.x},${next.y}`;
+      if (parents.has(key)) continue;
+      if (!canWalkGridStep(floor, current.x, current.y, next.x, next.y)) continue;
+      parents.set(key, current);
+      queue.push(next);
+    }
+  }
+
+  if (!parents.has(targetKey)) return [];
+  const path: { x: number; y: number }[] = [];
+  let current: { x: number; y: number } | null = { x: tx, y: ty };
+  while (current) {
+    path.push(current);
+    const parent = parents.get(`${current.x},${current.y}`);
+    current = parent ?? null;
+  }
+  path.reverse();
+  return path.slice(1);
+}
+
 export function findPath(
   floor: FloorState,
   x: number,

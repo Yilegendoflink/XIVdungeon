@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createNewGame } from '@/game/actions';
-import { attackEnemy, attackHero, canBasicAttack, calcDamage } from '@/systems/combat';
+import { attackDistance, attackEnemy, attackHero, canBasicAttack, calcDamage } from '@/systems/combat';
 
 describe('calcDamage', () => {
   it('never returns less than 1', () => {
@@ -20,7 +20,23 @@ describe('普通攻击范围', () => {
       y: state.hero.y + 2,
     };
 
-    expect(canBasicAttack(state.hero, target)).toBe(true);
+    expect(canBasicAttack(state.floor, state.hero, target)).toBe(true);
+    expect(attackDistance(state.floor, state.hero, target)).toBe(2);
+  });
+
+  it('地形阻挡时不能把坐标近的目标当作可攻击', () => {
+    const state = createNewGame(7);
+    const enemy = state.floor.enemies[0]!;
+    const x = state.hero.x + 1;
+    const y = state.hero.y + 1;
+    const tiles = [...state.floor.tiles];
+    tiles[state.hero.y * state.floor.width + x] = 'wall';
+    tiles[y * state.floor.width + state.hero.x] = 'wall';
+    const target = { ...enemy, x, y };
+    const targetState = { ...state, floor: { ...state.floor, tiles } };
+
+    expect(attackDistance(targetState.floor, targetState.hero, target)).toBeGreaterThan(2);
+    expect(canBasicAttack(targetState.floor, targetState.hero, target)).toBe(false);
   });
 
   it('超出范围的攻击不改变状态', () => {
