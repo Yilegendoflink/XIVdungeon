@@ -107,6 +107,7 @@ export interface LogEntry {
 
 export interface RunStats {
   kills: number;
+  experience: number;
 }
 
 export interface GameState {

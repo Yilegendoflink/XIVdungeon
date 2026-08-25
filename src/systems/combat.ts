@@ -1,5 +1,6 @@
 import type { DamageEventKind, EnemyState, FloorState, GameState, HeroState } from '@/game/state';
 import { enemyName, heroAtk } from '@/game/state';
+import { ENEMY_DEFS } from '@/data/enemies';
 import { findTerrainPath } from '@/world/pathfinding';
 
 export const BASIC_ATTACK_RANGE = 2;
@@ -97,10 +98,21 @@ export function attackEnemy(state: GameState, enemy: EnemyState): GameState {
   s = addDamageEvent(s, 'dealt', enemy.x, enemy.y, dmg);
 
   if (!enemies.some((e) => e.id === enemy.id)) {
+    const def = ENEMY_DEFS[enemy.type];
+    const rewardMultiplier = enemy.isBoss ? 2 : 1;
+    const experience = randInt(
+      def.experience.min * rewardMultiplier,
+      def.experience.max * rewardMultiplier,
+    );
+    const gil = randInt(def.gil.min * rewardMultiplier, def.gil.max * rewardMultiplier);
     s = {
       ...s,
-      stats: { kills: s.stats.kills + 1 },
-      log: [...s.log, { turn: s.turn, text: `${enemyName(enemy.type)} 被击败了！` }],
+      hero: { ...s.hero, gil: s.hero.gil + gil },
+      stats: { kills: s.stats.kills + 1, experience: s.stats.experience + experience },
+      log: [...s.log, {
+        turn: s.turn,
+        text: `${enemyName(enemy.type)} 被击败了！获得 ${experience} 点经验和 ${gil} Gil。`,
+      }],
     };
     s = updateObjectiveAfterKill(s, enemy);
   }

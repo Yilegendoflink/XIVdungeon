@@ -1,17 +1,48 @@
 import type { EnemyType } from '@/game/state';
 
+export interface RewardRange {
+  min: number;
+  max: number;
+}
+
 export interface EnemyDef {
   type: EnemyType;
   power: number;
+  experience: RewardRange;
+  gil: RewardRange;
   hp: number;
   atk: number;
   def: number;
 }
 
 export const ENEMY_DEFS: Record<EnemyType, EnemyDef> = {
-  bomb: { type: 'bomb', power: 1, hp: 8, atk: 3, def: 0 },
-  cactuar: { type: 'cactuar', power: 2, hp: 6, atk: 2, def: 0 },
-  morbol: { type: 'morbol', power: 4, hp: 30, atk: 6, def: 2 },
+  bomb: {
+    type: 'bomb',
+    power: 1,
+    experience: { min: 2, max: 4 },
+    gil: { min: 1, max: 3 },
+    hp: 8,
+    atk: 3,
+    def: 0,
+  },
+  cactuar: {
+    type: 'cactuar',
+    power: 2,
+    experience: { min: 3, max: 6 },
+    gil: { min: 2, max: 5 },
+    hp: 6,
+    atk: 2,
+    def: 0,
+  },
+  morbol: {
+    type: 'morbol',
+    power: 4,
+    experience: { min: 12, max: 18 },
+    gil: { min: 8, max: 14 },
+    hp: 30,
+    atk: 6,
+    def: 2,
+  },
 };
 
 export interface EnemyFloorRule {

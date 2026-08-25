@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ENEMY_DEFS } from '@/data/enemies';
 import { createNewGame } from '@/game/actions';
 import { attackDistance, attackEnemy, attackHero, canBasicAttack, calcDamage } from '@/systems/combat';
 
@@ -147,5 +148,43 @@ describe('普通攻击范围', () => {
       y: targetState.hero.y,
       kind: 'received',
     });
+  });
+
+  it('击败敌人后随机获得区间内的经验和金币', () => {
+    const state = createNewGame(7);
+    const enemy = state.floor.enemies[0]!;
+    const target = { ...enemy, x: state.hero.x + 1, y: state.hero.y, hp: 1, maxHp: 1 };
+    const targetState = { ...state, floor: { ...state.floor, enemies: [target] } };
+    const next = attackEnemy(targetState, target);
+    const reward = ENEMY_DEFS[target.type];
+
+    expect(next.stats.experience).toBeGreaterThanOrEqual(reward.experience.min);
+    expect(next.stats.experience).toBeLessThanOrEqual(reward.experience.max);
+    expect(next.hero.gil).toBeGreaterThanOrEqual(reward.gil.min);
+    expect(next.hero.gil).toBeLessThanOrEqual(reward.gil.max);
+    expect(next.log[next.log.length - 1]?.text).toContain('获得');
+  });
+
+  it('Boss 击败奖励使用双倍区间', () => {
+    const state = createNewGame(7);
+    const enemy = state.floor.enemies[0]!;
+    const target = {
+      ...enemy,
+      type: 'morbol' as const,
+      x: state.hero.x + 1,
+      y: state.hero.y,
+      hp: 1,
+      maxHp: 1,
+      isSpecial: true,
+      isBoss: true,
+    };
+    const targetState = { ...state, floor: { ...state.floor, enemies: [target] } };
+    const next = attackEnemy(targetState, target);
+    const reward = ENEMY_DEFS.morbol;
+
+    expect(next.stats.experience).toBeGreaterThanOrEqual(reward.experience.min * 2);
+    expect(next.stats.experience).toBeLessThanOrEqual(reward.experience.max * 2);
+    expect(next.hero.gil).toBeGreaterThanOrEqual(reward.gil.min * 2);
+    expect(next.hero.gil).toBeLessThanOrEqual(reward.gil.max * 2);
   });
 });

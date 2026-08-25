@@ -8,7 +8,7 @@ export const NORMAL_FLOOR_COUNT = 5;
 export const BOSS_FLOOR_NUMBER = NORMAL_FLOOR_COUNT + 1;
 
 export const INVENTORY_SIZE = 10;
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 export const SAVE_KEY = 'xiv-dungeon-save';
 export const DEFAULT_PLAYER_JOB = 'dragoon';
 export const PLAYER_ASSET_DIR = `${import.meta.env.BASE_URL}assets/player/`;

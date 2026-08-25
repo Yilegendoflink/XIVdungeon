@@ -130,7 +130,7 @@ export function updateScreens(
   ui.bagBtn.classList.toggle('hidden', !state || (phase !== 'playing' && phase !== 'inventory'));
 
   if (state && phase === 'dead') {
-    ui.deathStats.innerHTML = `<p>击杀数：${state.stats.kills}</p><p>回合数：${state.turn}</p>`;
+    ui.deathStats.innerHTML = `<p>击杀数：${state.stats.kills}</p><p>经验：${state.stats.experience}</p><p>回合数：${state.turn}</p>`;
   }
 
   if (state) {

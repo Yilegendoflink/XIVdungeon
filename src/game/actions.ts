@@ -68,7 +68,7 @@ export function createNewGame(
       { turn: 0, text: '你进入了地牢。' },
       { turn: 0, text: `第 1 层目标：${floor.objective.label}` },
     ],
-    stats: { kills: 0 },
+    stats: { kills: 0, experience: 0 },
   };
 
   computeFOV(state.floor, state.hero.x, state.hero.y);

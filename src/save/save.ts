@@ -232,7 +232,8 @@ function isValidState(state: unknown): state is GameState {
     Array.isArray(state.log) &&
     state.log.every(isValidLogEntry) &&
     isRecord(stats) &&
-    isNonNegativeInteger(stats.kills)
+    isNonNegativeInteger(stats.kills) &&
+    isNonNegativeInteger(stats.experience)
   );
 }
 
