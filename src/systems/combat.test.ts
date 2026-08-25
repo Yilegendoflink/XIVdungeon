@@ -127,4 +127,25 @@ describe('普通攻击范围', () => {
 
     expect(attackHero(targetState, enemy).hero.hp).toBe(targetState.hero.maxHp);
   });
+
+  it('记录玩家造成和受到的伤害事件', () => {
+    const state = createNewGame(7);
+    const enemy = state.floor.enemies[0]!;
+    const target = { ...enemy, x: state.hero.x + 1, y: state.hero.y, hp: 1, maxHp: 1 };
+    const targetState = { ...state, floor: { ...state.floor, enemies: [target] } };
+
+    const afterPlayerAttack = attackEnemy(targetState, target);
+    expect(afterPlayerAttack.damageEvents[afterPlayerAttack.damageEvents.length - 1]).toMatchObject({
+      x: target.x,
+      y: target.y,
+      kind: 'dealt',
+    });
+
+    const afterEnemyAttack = attackHero(targetState, target);
+    expect(afterEnemyAttack.damageEvents[afterEnemyAttack.damageEvents.length - 1]).toMatchObject({
+      x: targetState.hero.x,
+      y: targetState.hero.y,
+      kind: 'received',
+    });
+  });
 });

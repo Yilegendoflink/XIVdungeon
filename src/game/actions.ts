@@ -62,6 +62,8 @@ export function createNewGame(
       buffs: [],
     },
     floor,
+    damageEventSequence: 0,
+    damageEvents: [],
     log: [
       { turn: 0, text: '你进入了地牢。' },
       { turn: 0, text: `第 1 层目标：${floor.objective.label}` },

@@ -38,6 +38,16 @@ export interface JobResourceState {
   max?: number;
 }
 
+export type DamageEventKind = 'dealt' | 'received';
+
+export interface DamageEvent {
+  id: string;
+  x: number;
+  y: number;
+  amount: number;
+  kind: DamageEventKind;
+}
+
 export interface ItemState {
   id: string;
   type: ItemType;
@@ -48,6 +58,7 @@ export interface ItemState {
 export interface EnemyState {
   id: string;
   type: EnemyType;
+  power: number;
   x: number;
   y: number;
   hp: number;
@@ -106,6 +117,8 @@ export interface GameState {
   modifiers: GameModifiers;
   hero: HeroState;
   floor: FloorState;
+  damageEventSequence: number;
+  damageEvents: DamageEvent[];
   log: LogEntry[];
   stats: RunStats;
 }

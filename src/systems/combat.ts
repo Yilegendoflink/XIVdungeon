@@ -1,4 +1,4 @@
-import type { EnemyState, FloorState, GameState, HeroState } from '@/game/state';
+import type { DamageEventKind, EnemyState, FloorState, GameState, HeroState } from '@/game/state';
 import { enemyName, heroAtk } from '@/game/state';
 import { findTerrainPath } from '@/world/pathfinding';
 
@@ -16,6 +16,24 @@ export function canBasicAttack(floor: FloorState, hero: HeroState, enemy: EnemyS
 
 function randInt(min: number, max: number): number {
   return min + Math.floor(Math.random() * (max - min + 1));
+}
+
+function addDamageEvent(
+  state: GameState,
+  kind: DamageEventKind,
+  x: number,
+  y: number,
+  amount: number,
+): GameState {
+  const sequence = state.damageEventSequence + 1;
+  return {
+    ...state,
+    damageEventSequence: sequence,
+    damageEvents: [
+      ...state.damageEvents,
+      { id: `damage-${sequence}`, x, y, amount, kind },
+    ].slice(-32),
+  };
 }
 
 function updateObjectiveAfterKill(state: GameState, enemy: EnemyState): GameState {
@@ -76,6 +94,7 @@ export function attackEnemy(state: GameState, enemy: EnemyState): GameState {
     floor: { ...state.floor, enemies },
     log: [...state.log, { turn: state.turn, text: `你攻击了${enemyName(enemy.type)}，造成 ${dmg} 点伤害。` }],
   };
+  s = addDamageEvent(s, 'dealt', enemy.x, enemy.y, dmg);
 
   if (!enemies.some((e) => e.id === enemy.id)) {
     s = {
@@ -95,7 +114,7 @@ export function attackHero(state: GameState, enemy: EnemyState, ranged = false):
     hp: state.modifiers.infiniteHp ? state.hero.maxHp : state.hero.hp - dmg,
   };
   const verb = ranged ? '射击' : '攻击';
-  return {
+  return addDamageEvent({
     ...state,
     hero,
     log: [
@@ -107,5 +126,5 @@ export function attackHero(state: GameState, enemy: EnemyState, ranged = false):
           : `${enemyName(enemy.type)}${verb}你，造成 ${dmg} 点伤害。`,
       },
     ],
-  };
+  }, 'received', state.hero.x, state.hero.y, dmg);
 }

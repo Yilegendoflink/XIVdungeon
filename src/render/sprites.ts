@@ -51,6 +51,17 @@ export function drawEnemy(parent: Container, enemy: EnemyState): void {
   label.anchor.set(0.5);
   label.position.set(enemy.x * TILE_SIZE + TILE_SIZE / 2, enemy.y * TILE_SIZE + TILE_SIZE / 2);
   parent.addChild(label);
+
+  if (enemy.hp < enemy.maxHp) {
+    const ratio = Math.max(0, Math.min(1, enemy.hp / enemy.maxHp));
+    const bar = new Graphics();
+    bar.rect(1, TILE_SIZE + 1, TILE_SIZE - 2, 3);
+    bar.fill(0x24131a);
+    bar.rect(1, TILE_SIZE + 1, (TILE_SIZE - 2) * ratio, 3);
+    bar.fill(0xe04b57);
+    bar.position.set(enemy.x * TILE_SIZE, enemy.y * TILE_SIZE);
+    parent.addChild(bar);
+  }
 }
 
 export function drawItem(parent: Container, item: ItemState): void {

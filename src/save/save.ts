@@ -83,6 +83,7 @@ function isValidEnemy(value: unknown): boolean {
   return (
     typeof value.id === 'string' &&
     isEnemyType(value.type) &&
+    isPositiveInteger(value.power) &&
     isCoordinate(value.x, MAP_W) &&
     isCoordinate(value.y, MAP_H) &&
     isFiniteNumber(value.hp) &&
@@ -117,6 +118,17 @@ function isValidModifiers(value: unknown): boolean {
   );
 }
 
+function isValidDamageEvent(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === 'string' &&
+    isCoordinate(value.x, MAP_W) &&
+    isCoordinate(value.y, MAP_H) &&
+    isPositiveInteger(value.amount) &&
+    (value.kind === 'dealt' || value.kind === 'received')
+  );
+}
+
 function isValidBuff(value: unknown): boolean {
   if (!isRecord(value)) return false;
   return (
@@ -146,6 +158,11 @@ function isValidState(state: unknown): state is GameState {
   if (state.version !== SAVE_VERSION || !isFiniteNumber(state.seed)) return false;
   if (!isNonNegativeInteger(state.turn) || !isPhase(state.phase)) return false;
   if (!isValidModifiers(state.modifiers)) return false;
+  if (
+    !isNonNegativeInteger(state.damageEventSequence) ||
+    !Array.isArray(state.damageEvents) ||
+    !state.damageEvents.every(isValidDamageEvent)
+  ) return false;
 
   const floor = state.floor;
   if (
@@ -228,7 +245,7 @@ export function saveGame(state: GameState): void {
   const blob: SaveBlob = {
     version: SAVE_VERSION,
     savedAt: Date.now(),
-    state,
+    state: { ...state, damageEvents: [] },
   };
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify(blob));
