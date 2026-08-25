@@ -56,6 +56,24 @@ describe('普通攻击范围', () => {
     expect(attackEnemy(targetState, target)).toBe(targetState);
   });
 
+  it('玩家主动攻击会让中立敌人进入仇恨态', () => {
+    const state = createNewGame(7);
+    const enemy = state.floor.enemies[0]!;
+    const target = {
+      ...enemy,
+      type: 'cactuar' as const,
+      x: state.hero.x + 1,
+      y: state.hero.y,
+      aiType: 'neutral' as const,
+      aiState: 'free' as const,
+      hp: 99,
+      maxHp: 99,
+    };
+    const targetState = { ...state, floor: { ...state.floor, enemies: [target] } };
+
+    expect(attackEnemy(targetState, target).floor.enemies[0]?.aiState).toBe('aggro');
+  });
+
   it('完成击杀目标后解锁出口', () => {
     const state = createNewGame(7);
     const enemy = state.floor.enemies[0]!;

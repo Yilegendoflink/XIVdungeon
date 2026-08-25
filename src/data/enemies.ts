@@ -1,4 +1,4 @@
-import type { EnemyType } from '@/game/state';
+import type { EnemyAiType, EnemyType } from '@/game/state';
 
 export interface RewardRange {
   min: number;
@@ -7,6 +7,8 @@ export interface RewardRange {
 
 export interface EnemyDef {
   type: EnemyType;
+  aiType: EnemyAiType;
+  aggroRange: number;
   power: number;
   experience: RewardRange;
   gil: RewardRange;
@@ -18,6 +20,8 @@ export interface EnemyDef {
 export const ENEMY_DEFS: Record<EnemyType, EnemyDef> = {
   bomb: {
     type: 'bomb',
+    aiType: 'standard',
+    aggroRange: 5,
     power: 1,
     experience: { min: 2, max: 4 },
     gil: { min: 1, max: 3 },
@@ -27,6 +31,8 @@ export const ENEMY_DEFS: Record<EnemyType, EnemyDef> = {
   },
   cactuar: {
     type: 'cactuar',
+    aiType: 'neutral',
+    aggroRange: 4,
     power: 2,
     experience: { min: 3, max: 6 },
     gil: { min: 2, max: 5 },
@@ -36,6 +42,8 @@ export const ENEMY_DEFS: Record<EnemyType, EnemyDef> = {
   },
   morbol: {
     type: 'morbol',
+    aiType: 'patrol',
+    aggroRange: 7,
     power: 4,
     experience: { min: 12, max: 18 },
     gil: { min: 8, max: 14 },

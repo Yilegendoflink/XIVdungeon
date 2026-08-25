@@ -3,6 +3,8 @@ import type { TileKind, VisibilityKind } from '@/config';
 
 export type GamePhase = 'title' | 'playing' | 'inventory' | 'dead' | 'victory';
 export type EnemyType = 'bomb' | 'cactuar' | 'morbol';
+export type EnemyAiType = 'standard' | 'neutral' | 'stationary' | 'patrol' | 'boss';
+export type EnemyAiState = 'free' | 'aggro';
 export type ItemType = 'hiPotion' | 'scrollOfMight' | 'gridanianRation';
 export type FloorObjectiveType = 'findExit' | 'defeatCount' | 'defeatSpecial' | 'finalBoss';
 
@@ -58,6 +60,10 @@ export interface ItemState {
 export interface EnemyState {
   id: string;
   type: EnemyType;
+  aiType: EnemyAiType;
+  aiState: EnemyAiState;
+  aggroRange: number;
+  patrolTargetRoomId?: number;
   power: number;
   x: number;
   y: number;
@@ -67,6 +73,23 @@ export interface EnemyState {
   def: number;
   isSpecial: boolean;
   isBoss: boolean;
+}
+
+export interface FloorRoomState {
+  id: number;
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  cx: number;
+  cy: number;
+}
+
+export interface FloorCorridorState {
+  id: number;
+  fromRoomId: number;
+  toRoomId: number;
+  cells: { x: number; y: number }[];
 }
 
 export interface HeroState {
@@ -95,6 +118,8 @@ export interface FloorState {
   entranceIndex: number;
   exitIndex: number;
   exitUnlocked: boolean;
+  rooms: FloorRoomState[];
+  corridors: FloorCorridorState[];
   objective: FloorObjectiveState;
   enemies: EnemyState[];
   items: ItemState[];

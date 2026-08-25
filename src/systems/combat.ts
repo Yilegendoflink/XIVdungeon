@@ -87,7 +87,7 @@ export function attackEnemy(state: GameState, enemy: EnemyState): GameState {
     ? enemy.hp
     : calcDamage(heroAtk(state.hero), enemy.def);
   const enemies = state.floor.enemies
-    .map((e) => (e.id === enemy.id ? { ...e, hp: e.hp - dmg } : e))
+    .map((e) => (e.id === enemy.id ? { ...e, hp: e.hp - dmg, aiState: 'aggro' as const } : e))
     .filter((e) => e.hp > 0);
 
   let s: GameState = {
