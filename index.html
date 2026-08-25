@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>XIV 地牢</title>
+  </head>
+  <body>
+    <div id="game-container">
+      <canvas id="game-canvas"></canvas>
+
+      <div id="ui-overlay">
+        <div id="hud">
+          <div id="job-info">职业：龙骑士</div>
+          <div id="hp-bar">
+            <div id="hp-fill"></div>
+            <span id="hp-text">20/20</span>
+          </div>
+          <div id="mp-info">MP：10/10</div>
+          <div id="resource-info">职业资源：龙血 0/3</div>
+          <div id="gil-info">Gil：0</div>
+          <div id="floor-info">第 1 层</div>
+          <div id="objective-info">目标：找到出口</div>
+          <div id="modifier-info" class="hidden"></div>
+          <div id="atk-info">攻击：5</div>
+          <div id="turn-info">回合：0</div>
+          <button id="bag-btn" class="hud-btn hidden" type="button">背包（I）</button>
+        </div>
+        <div id="log-panel"></div>
+      </div>
+
+      <div id="title-screen" class="overlay-screen">
+        <h1>XIV 地牢</h1>
+        <p>5 层地牢与最终 Boss</p>
+        <div id="title-actions" class="btn-row">
+          <button id="continue-btn" class="hidden" type="button">继续游戏</button>
+          <button id="new-game-btn" type="button">开始新游戏</button>
+        </div>
+        <p class="hint">点击空地寻路 · 点击 2 格内敌人攻击 · 方向键 / WASD 移动 · QEZC 斜向 · I 背包 · . 等待</p>
+        <div id="job-selection" class="job-selection hidden">
+          <h2>选择职业</h2>
+          <div class="job-options">
+            <button class="job-option selected" data-job="dragoon" type="button">
+              <strong>龙骑士</strong>
+              <span>以近战攻击为主的高机动职业</span>
+            </button>
+          </div>
+          <div class="modifier-selection">
+            <h3>修改器</h3>
+            <label><input type="checkbox" data-modifier="infiniteHp" />无限血量</label>
+            <label><input type="checkbox" data-modifier="autoCompleteObjectives" />每层直接完成任务目标</label>
+            <label><input type="checkbox" data-modifier="oneHitKill" />一击必杀</label>
+          </div>
+          <button id="confirm-job-btn" type="button">开始探索</button>
+        </div>
+      </div>
+
+      <div id="inventory-screen" class="overlay-screen hidden"></div>
+
+      <div id="victory-screen" class="overlay-screen hidden">
+        <h1>胜利！</h1>
+        <p>你击破了地牢底部的最终 Boss。</p>
+        <button id="play-again-btn" type="button">再玩一次</button>
+      </div>
+
+      <div id="death-screen" class="overlay-screen hidden">
+        <h1>你倒下了</h1>
+        <div id="death-stats"></div>
+        <button id="try-again-btn" type="button">再试一次</button>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
