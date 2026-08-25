@@ -382,11 +382,27 @@ body {
   white-space: nowrap;
 }
 
+.skill-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  max-width: 100%;
+}
+
 .skill-button small {
+  overflow: hidden;
+  max-width: 100%;
   color: var(--dim);
   font-family: Consolas, monospace;
   font-size: 9px;
   line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skill-button .skill-cost {
+  color: var(--mp);
 }
 
 .skill-button:disabled {
@@ -404,13 +420,6 @@ body {
 .skill-slot:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
-}
-
-.skill-button > small {
-  overflow: hidden;
-  max-width: 100%;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .skill-button img[hidden] {

@@ -219,7 +219,7 @@ export function updateScreens(
       const skill = SKILL_DEFINITIONS[skillId];
       const cooldown = state.hero.skillCooldowns[skillId];
       const disabled = phase !== 'playing' || state.hero.mp < skill.mpCost || cooldown > 0;
-      return `<button class="skill-button" type="button" data-skill="${skillId}" ${disabled ? 'disabled' : ''} title="${skill.name}：${skill.mpCost} MP，冷却 ${skill.cooldownTurns} 回合"><span class="skill-slot-number">${index + 1}</span><img src="${skillIconPath(skillId)}" alt="" onerror="this.hidden=true"><span class="skill-name">${skill.name}</span><small>${cooldown > 0 ? `CD ${cooldown}` : `${skill.mpCost} MP`}</small></button>`;
+      return `<button class="skill-button" type="button" data-skill="${skillId}" ${disabled ? 'disabled' : ''} title="${skill.name}：消耗 ${skill.mpCost} MP，冷却 ${skill.cooldownTurns} 回合"><span class="skill-slot-number">${index + 1}</span><img src="${skillIconPath(skillId)}" alt="" onerror="this.hidden=true"><span class="skill-name">${skill.name}</span><span class="skill-meta"><small class="skill-cost">MP ${skill.mpCost}</small>${cooldown > 0 ? `<small class="skill-cooldown">CD ${cooldown}</small>` : ''}</span></button>`;
     }).join('');
     ui.skillBar.querySelectorAll<HTMLButtonElement>('[data-skill]').forEach((button) => {
       button.addEventListener('click', () => opts.onSelectSkill(button.dataset.skill as SkillId));

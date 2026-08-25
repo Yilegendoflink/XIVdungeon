@@ -1,5 +1,5 @@
 import { Application, Assets, Container, Graphics, Text, type Texture } from 'pixi.js';
-import { DEFAULT_PLAYER_JOB, MAP_H, MAP_W, playerTexturePath, RENDER_SCALE, TILE_SIZE } from '@/config';
+import { DEFAULT_PLAYER_JOB, playerTexturePath, RENDER_SCALE, TILE_SIZE } from '@/config';
 import type { DamageEvent, GameState } from '@/game/state';
 import { idx, isPassable } from '@/game/state';
 import { drawTile } from '@/render/tiles';
@@ -228,17 +228,11 @@ export class GameRenderer {
   private updateCamera(state: GameState): void {
     const viewportWidth = this.app.renderer.width / RENDER_SCALE;
     const viewportHeight = this.app.renderer.height / RENDER_SCALE;
-    const worldWidth = MAP_W * TILE_SIZE;
-    const worldHeight = MAP_H * TILE_SIZE;
     const heroCenterX = state.hero.x * TILE_SIZE + TILE_SIZE / 2;
     const heroCenterY = state.hero.y * TILE_SIZE + TILE_SIZE / 2;
 
-    this.cameraX = viewportWidth >= worldWidth
-      ? (viewportWidth - worldWidth) / 2
-      : Math.max(viewportWidth - worldWidth, Math.min(0, viewportWidth / 2 - heroCenterX));
-    this.cameraY = viewportHeight >= worldHeight
-      ? (viewportHeight - worldHeight) / 2
-      : Math.max(viewportHeight - worldHeight, Math.min(0, viewportHeight / 2 - heroCenterY));
+    this.cameraX = viewportWidth / 2 - heroCenterX;
+    this.cameraY = viewportHeight / 2 - heroCenterY;
     this.world.position.set(this.cameraX, this.cameraY);
   }
 }
