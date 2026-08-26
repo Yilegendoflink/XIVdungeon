@@ -86,6 +86,7 @@ export interface PlayerDamageResult {
   amount: number;
   directHit: boolean;
   critical: boolean;
+  lifeSurgeRestore: number;
 }
 
 /**
@@ -96,16 +97,22 @@ export function resolvePlayerDamage(hero: HeroState, defense: number, potency = 
   const primaryAttribute = getJobDefinition(hero.jobId)?.primaryAttribute ?? 'strength';
   let amount = calcDamage(heroAtk(hero, primaryAttribute) * (potency / 100), defense);
   amount = Math.round(amount * (1 + hero.attributes.determination / 1000));
+  if (hero.buffs.some((buff) => buff.type === 'dragonSight')) amount *= 2;
   const directHit = Math.random() < Math.min(1, hero.attributes.directHit / 1000);
-  const critical = Math.random() < Math.min(1, hero.attributes.criticalHit / 1000);
+  const guaranteedCritical = hero.buffs.some((buff) => buff.type === 'lifeSurge');
+  const critical = guaranteedCritical || Math.random() < Math.min(1, hero.attributes.criticalHit / 1000);
   if (directHit) amount = Math.round(amount * 1.4);
   if (critical) amount = Math.round(amount * (1.5 + Math.min(0.5, hero.attributes.criticalHit / 2000)));
-  return { amount: Math.max(1, amount), directHit, critical };
+  return { amount: Math.max(1, amount), directHit, critical, lifeSurgeRestore: guaranteedCritical ? Math.floor(Math.max(1, amount) * 0.1) : 0 };
 }
 
 /** 坚韧提供最高 50% 的敌方伤害减免，但不会让单次伤害低于 1。 */
 export function mitigateHeroDamage(amount: number, hero: HeroState): number {
-  return Math.max(1, Math.floor(amount * (1 - Math.min(0.5, hero.attributes.tenacity / 1000))));
+  const tenacity = hero.passives.includes('bloodbath')
+    ? hero.attributes.tenacity * 0.8
+    : hero.attributes.tenacity;
+  const reduction = Math.min(0.5, tenacity / 1000);
+  return Math.max(1, Math.floor(amount * (1 - reduction)));
 }
 
 export function damageEnemy(state: GameState, enemy: EnemyState, result: PlayerDamageResult): GameState {
@@ -122,6 +129,19 @@ export function damageEnemy(state: GameState, enemy: EnemyState, result: PlayerD
       text: `你攻击了${enemyName(enemy.type)}，造成 ${dmg} 点伤害。${result.directHit ? '直击！' : ''}${result.critical ? '暴击！' : ''}`,
     }],
   };
+  const lifeSurgeActive = state.hero.buffs.some((buff) => buff.type === 'lifeSurge');
+  const bloodbathRestore = state.hero.passives.includes('bloodbath') ? Math.floor(dmg * 0.01) : 0;
+  if (result.lifeSurgeRestore > 0 || lifeSurgeActive || bloodbathRestore > 0) {
+    const buffs = s.hero.buffs.filter((buff) => buff.type !== 'lifeSurge');
+    s = {
+      ...s,
+      hero: {
+        ...s.hero,
+        hp: Math.min(s.hero.maxHp, s.hero.hp + result.lifeSurgeRestore + bloodbathRestore),
+        buffs,
+      },
+    };
+  }
   s = addDamageEvent(s, 'dealt', enemy.x, enemy.y, dmg);
 
   if (!enemies.some((e) => e.id === enemy.id)) {
@@ -148,7 +168,7 @@ export function damageEnemy(state: GameState, enemy: EnemyState, result: PlayerD
         ...s,
         phase: 'levelUp',
         pendingLevelRewards: progression.levelsGained,
-        levelUpRewards: rollLevelUpRewards(),
+        levelUpRewards: rollLevelUpRewards(s.hero, s.hero.jobId),
       };
     }
   }

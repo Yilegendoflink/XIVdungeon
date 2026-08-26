@@ -3,7 +3,7 @@ import { ENEMY_DEFS } from '@/data/enemies';
 import { getJobDefinition } from '@/data/jobs';
 import type { TileKind, VisibilityKind } from '@/config';
 import { generateMapLayout, mapTemplateForObjective } from '@/world/generate';
-import { experienceRequiredForLevel, type EnemyAiState, type EnemyAiType, type EnemyType, type FloorObjectiveType, type GamePhase, type GameState, type ItemType, type LevelUpRewardId, type SkillId } from '@/game/state';
+import { defaultRewardWeights, experienceRequiredForLevel, LEVEL_UP_REWARD_IDS, type EnemyAiState, type EnemyAiType, type EnemyType, type FloorObjectiveType, type GamePhase, type GameState, type ItemType, type LevelUpRewardId, type PassiveId, type SkillId } from '@/game/state';
 
 interface SaveBlob {
   version: number;
@@ -12,8 +12,9 @@ interface SaveBlob {
 }
 
 const PHASES: GamePhase[] = ['title', 'playing', 'inventory', 'levelUp', 'dead', 'victory'];
-const LEVEL_UP_REWARDS: LevelUpRewardId[] = ['attack', 'survival', 'critical'];
-const SKILL_IDS: SkillId[] = ['jump'];
+const LEVEL_UP_REWARDS: LevelUpRewardId[] = LEVEL_UP_REWARD_IDS;
+const SKILL_IDS: SkillId[] = ['jump', 'lifeSurge', 'geirskogul', 'elusiveJump', 'dragonSight'];
+const PASSIVE_IDS: PassiveId[] = ['bloodOfDragon', 'jumpMastery', 'bloodbath'];
 const ENEMY_TYPES: EnemyType[] = ['bomb', 'cactuar', 'morbol'];
 const ENEMY_AI_TYPES: EnemyAiType[] = ['standard', 'neutral', 'stationary', 'patrol', 'boss'];
 const ENEMY_AI_STATES: EnemyAiState[] = ['free', 'aggro'];
@@ -177,11 +178,11 @@ function isValidDamageEvent(value: unknown): boolean {
 
 function isValidBuff(value: unknown): boolean {
   if (!isRecord(value)) return false;
-  return (
-    value.type === 'might' &&
-    isFiniteNumber(value.value) &&
-    isPositiveInteger(value.turnsLeft)
-  );
+  if (value.type === 'dragonEye') return isPositiveInteger(value.stacks) && value.stacks <= 3;
+  if (!isPositiveInteger(value.turnsLeft)) return false;
+  return value.type === 'might'
+    ? isFiniteNumber(value.value)
+    : value.type === 'lifeSurge' || value.type === 'dragonSight';
 }
 
 function isValidJobResource(value: unknown): boolean {
@@ -215,6 +216,10 @@ function isLevelUpReward(value: unknown): value is LevelUpRewardId {
 
 function isValidSkillCooldowns(value: unknown): boolean {
   return isRecord(value) && SKILL_IDS.every((skillId) => isNonNegativeInteger(value[skillId]));
+}
+
+function isValidRewardWeights(value: unknown): boolean {
+  return isRecord(value) && LEVEL_UP_REWARDS.every((reward) => isFiniteNumber(value[reward]) && value[reward] >= 0);
 }
 
 function isValidLogEntry(value: unknown): boolean {
@@ -306,6 +311,16 @@ function isValidState(state: unknown): state is GameState {
     (hero.level === MAX_LEVEL ? hero.experience !== 0 : hero.experience >= experienceRequiredForLevel(hero.level)) ||
     !isValidAttributes(hero.attributes) ||
     !isValidSkillCooldowns(hero.skillCooldowns) ||
+    !Array.isArray(hero.unlockedSkills) ||
+    !hero.unlockedSkills.every((skillId) => SKILL_IDS.includes(skillId as SkillId)) ||
+    new Set(hero.unlockedSkills).size !== hero.unlockedSkills.length ||
+    !Array.isArray(hero.passives) ||
+    !hero.passives.every((passiveId) => PASSIVE_IDS.includes(passiveId as PassiveId)) ||
+    new Set(hero.passives).size !== hero.passives.length ||
+    !Array.isArray(hero.claimedLevelRewards) ||
+    !hero.claimedLevelRewards.every(isLevelUpReward) ||
+    new Set(hero.claimedLevelRewards).size !== hero.claimedLevelRewards.length ||
+    !isValidRewardWeights(hero.rewardWeights) ||
     !isFiniteNumber(hero.def) ||
     !Array.isArray(hero.inventory) ||
     !hero.inventory.every(isValidItem) ||
@@ -328,7 +343,7 @@ function isValidState(state: unknown): state is GameState {
 function migrateSave(value: unknown): unknown {
   if (
     !isRecord(value) ||
-    ![SAVE_VERSION - 4, SAVE_VERSION - 3, SAVE_VERSION - 2, SAVE_VERSION - 1].includes(value.version as number) ||
+    ![SAVE_VERSION - 6, SAVE_VERSION - 5, SAVE_VERSION - 4, SAVE_VERSION - 3, SAVE_VERSION - 2, SAVE_VERSION - 1].includes(value.version as number) ||
     !isRecord(value.state) ||
     !isRecord(value.state.hero) ||
     !isRecord(value.state.floor)
@@ -387,7 +402,11 @@ function migrateSave(value: unknown): unknown {
         ...(legacyVersion <= SAVE_VERSION - 2
           ? { level: 1, experience: 0, attributes: { ...job.attributes } }
           : {}),
-        skillCooldowns: { jump: 0 },
+        skillCooldowns: { jump: 0, lifeSurge: 0, geirskogul: 0, elusiveJump: 0, dragonSight: 0 },
+        unlockedSkills: [],
+        passives: [],
+        claimedLevelRewards: [],
+        rewardWeights: defaultRewardWeights(),
       },
       floor: { ...oldFloor, rooms, corridors, enemies },
       levelUpRewards: [],

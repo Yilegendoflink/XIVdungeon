@@ -1,6 +1,6 @@
 import { BOSS_FLOOR_NUMBER } from '@/config';
 import type { GameState } from '@/game/state';
-import { isPassable, mpRegenPerTurn } from '@/game/state';
+import { isPassable, mpRegenPerTurn, type SkillId } from '@/game/state';
 import type { PlayerAction } from '@/game/actions';
 import { applyFloorModifiers, applyLevelUpReward, heroOnExit } from '@/game/actions';
 import { computeFOV } from '@/world/fov';
@@ -9,6 +9,7 @@ import { processEnemyTurns } from '@/systems/ai';
 import { tickBuffs, tryPickup, useItem } from '@/systems/inventory';
 import { generateFloor } from '@/world/generate';
 import { useSkill } from '@/systems/skills';
+import { skillSpendsTurn } from '@/systems/skills';
 
 function enemyInDirection(state: GameState, dx: number, dy: number) {
   if (dx === 0 && dy === 0) return undefined;
@@ -56,7 +57,9 @@ function applyPlayerAction(state: GameState, action: PlayerAction): GameState {
 
   if (action.type === 'attack') {
     const enemy = state.floor.enemies.find((candidate) => candidate.id === action.enemyId);
-    return enemy ? attackEnemy(state, enemy) : state;
+    return enemy
+      ? attackEnemy({ ...state, hero: { ...state.hero, lastDirection: { dx: Math.sign(enemy.x - state.hero.x), dy: Math.sign(enemy.y - state.hero.y) } } }, enemy)
+      : state;
   }
 
   if (action.type === 'wait') {
@@ -65,18 +68,19 @@ function applyPlayerAction(state: GameState, action: PlayerAction): GameState {
 
   if (action.type === 'move') {
     const directionalEnemy = enemyInDirection(state, action.dx, action.dy);
-    if (directionalEnemy) return attackEnemy(state, directionalEnemy);
+    const facingState = { ...state, hero: { ...state.hero, lastDirection: { dx: action.dx, dy: action.dy } } };
+    if (directionalEnemy) return attackEnemy(facingState, directionalEnemy);
 
     const nx = state.hero.x + action.dx;
     const ny = state.hero.y + action.dy;
     const enemy = state.floor.enemies.find((e) => e.x === nx && e.y === ny);
-    if (enemy) return attackEnemy(state, enemy);
+    if (enemy) return attackEnemy(facingState, enemy);
 
     if (!isPassable(state.floor, nx, ny)) return state;
 
     let s: GameState = {
       ...state,
-      hero: { ...state.hero, x: nx, y: ny },
+      hero: { ...state.hero, x: nx, y: ny, lastDirection: { dx: action.dx, dy: action.dy } },
     };
     s = tryPickup(s);
 
@@ -141,6 +145,10 @@ export function processTurn(state: GameState, action: PlayerAction): GameState {
 
   let s = s0;
   if (s.phase === 'victory' || s.phase === 'levelUp') return s;
+  if (action.type === 'useSkill' && !skillSpendsTurn(action.skillId)) {
+    computeFOV(s.floor, s.hero.x, s.hero.y);
+    return s;
+  }
   const floorChanged = s.floor.number !== state.floor.number;
 
   // Using an item or skill from the player action flow still spends a turn.
@@ -150,7 +158,9 @@ export function processTurn(state: GameState, action: PlayerAction): GameState {
       ...s,
       hero: {
         ...s.hero,
-        skillCooldowns: { jump: Math.max(0, s.hero.skillCooldowns.jump - 1) },
+        skillCooldowns: Object.fromEntries(
+          Object.entries(s.hero.skillCooldowns).map(([skillId, cooldown]) => [skillId, Math.max(0, cooldown - 1)]),
+        ) as Record<SkillId, number>,
       },
     };
   }

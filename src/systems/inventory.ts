@@ -82,15 +82,15 @@ export function useItem(state: GameState, index: number): GameState {
 /** Tick buff durations after a player action. */
 export function tickBuffs(state: GameState): GameState {
   const buffs = state.hero.buffs
-    .map((b) => ({ ...b, turnsLeft: b.turnsLeft - 1 }))
-    .filter((b) => b.turnsLeft > 0);
+    .map((b) => b.type === 'dragonEye' ? b : { ...b, turnsLeft: b.turnsLeft - 1 })
+    .filter((b) => b.type === 'dragonEye' || b.turnsLeft > 0);
 
   const expired = state.hero.buffs.length > buffs.length;
   let s: GameState = { ...state, hero: { ...state.hero, buffs } };
   if (expired) {
     s = {
       ...s,
-      log: [...s.log, { turn: s.turn, text: '力量效果消失了。' }],
+      log: [...s.log, { turn: s.turn, text: '一个增益效果消失了。' }],
     };
   }
   return s;

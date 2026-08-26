@@ -7,6 +7,7 @@ import {
   attackHero,
   canBasicAttack,
   calcDamage,
+  damageEnemy,
   mitigateHeroDamage,
   resolvePlayerDamage,
 } from '@/systems/combat';
@@ -45,7 +46,7 @@ describe('属性伤害结算', () => {
       },
     };
 
-    expect(resolvePlayerDamage(hero, 0)).toEqual({ amount: 30, directHit: true, critical: true });
+    expect(resolvePlayerDamage(hero, 0)).toEqual({ amount: 30, directHit: true, critical: true, lifeSurgeRestore: 0 });
     vi.restoreAllMocks();
   });
 
@@ -58,6 +59,29 @@ describe('属性伤害结算', () => {
 
     expect(mitigateHeroDamage(100, hero)).toBe(50);
     expect(mitigateHeroDamage(1, hero)).toBe(1);
+  });
+
+  it('巨龙视线影响伤害，未激活浴血时苍天龙血不改变减伤', () => {
+    const hero = createNewGame(7).hero;
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const base = resolvePlayerDamage(hero, 0).amount;
+    const empowered = resolvePlayerDamage({ ...hero, buffs: [{ type: 'dragonSight', turnsLeft: 10 }] }, 0).amount;
+    expect(empowered).toBeGreaterThan(base);
+    expect(mitigateHeroDamage(100, { ...hero, hp: 10, attributes: { ...hero.attributes, tenacity: 0 }, passives: ['bloodOfDragon'] })).toBe(100);
+    vi.restoreAllMocks();
+  });
+
+  it('浴血按表格使用 0.8 倍坚韧并回复造成伤害的 1% HP', () => {
+    const state = createNewGame(7);
+    const bloodbathHero = { ...state.hero, hp: 10, passives: ['bloodbath' as const] };
+    expect(mitigateHeroDamage(100, bloodbathHero)).toBe(96);
+    const enemy = { ...state.floor.enemies[0]!, hp: 999, maxHp: 999 };
+    const healed = damageEnemy(
+      { ...state, hero: bloodbathHero, floor: { ...state.floor, enemies: [enemy] } },
+      enemy,
+      { amount: 200, directHit: false, critical: false, lifeSurgeRestore: 0 },
+    );
+    expect(healed.hero.hp).toBe(12);
   });
 });
 
@@ -249,7 +273,8 @@ describe('普通攻击范围', () => {
     const next = attackEnemy({ ...state, floor: { ...state.floor, enemies: [target] } }, target);
 
     expect(next).toMatchObject({ phase: 'levelUp', pendingLevelRewards: 1 });
-    expect(new Set(next.levelUpRewards)).toEqual(new Set(['attack', 'survival', 'critical']));
+    expect(next.levelUpRewards).toHaveLength(3);
+    expect(new Set(next.levelUpRewards).size).toBe(3);
   });
 
   it('Boss 击败奖励使用双倍区间', () => {

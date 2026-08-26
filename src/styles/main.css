@@ -382,6 +382,12 @@ body {
   white-space: nowrap;
 }
 
+.skill-button .skill-english {
+  color: var(--accent-bright);
+  font-size: 8px;
+  line-height: 1;
+}
+
 .skill-meta {
   display: flex;
   align-items: center;
@@ -522,6 +528,51 @@ body {
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--line-soft);
+}
+
+.passive-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.passive-section h3 {
+  color: var(--accent-bright);
+  font-size: 12px;
+}
+
+.passive-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.passive-card {
+  display: grid;
+  gap: 3px;
+  padding: 7px 8px;
+  border: 1px solid var(--line-soft);
+  background: var(--surface);
+}
+
+.passive-card strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.passive-card strong small,
+.reward-english {
+  display: block;
+  margin-top: 2px;
+  color: var(--accent-bright);
+  font-size: 9px;
+  font-weight: normal;
+}
+
+.passive-card span,
+.passive-empty {
+  color: var(--dim);
+  font-size: 11px;
 }
 
 #log-panel {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createNewGame } from '@/game/actions';
 import { processTurn } from '@/game/turn';
 import { idx, isPassable } from '@/game/state';
-import { canTargetJump, useSkill } from '@/systems/skills';
+import { canTargetJump, cooldownTurnsFor, useSkill } from '@/systems/skills';
 
 function jumpReadyState() {
   const state = createNewGame(7);
@@ -60,5 +60,56 @@ describe('跳跃', () => {
     expect(next.hero.skillCooldowns.jump).toBe(7);
     expect(next.turn).toBe(cast.turn + 1);
     expect(next.floor.visibility[idx(target.x, target.y, next.floor.width)]).toBe('visible');
+  });
+
+  it('获得龙剑后可施放无回合技能', () => {
+    const { target, ...state } = jumpReadyState();
+    const hero = { ...state.hero, unlockedSkills: ['lifeSurge' as const], passives: ['jumpMastery' as const] };
+    const empowered = useSkill({ ...state, hero }, 'lifeSurge', { x: hero.x, y: hero.y });
+
+    expect(empowered.hero).toMatchObject({ mp: 100, skillCooldowns: { lifeSurge: 20 } });
+    expect(empowered.hero.buffs).toContainEqual({ type: 'lifeSurge', turnsLeft: 3 });
+    expect(cooldownTurnsFor(hero, 'jump')).toBe(8);
+    expect(useSkill({ ...state, hero }, 'jump', target).hero.skillCooldowns.jump).toBe(8);
+  });
+
+  it('苍天龙血让跳跃获得最多三层龙眼，武神枪消耗龙眼', () => {
+    const { target, ...state } = jumpReadyState();
+    const hero = {
+      ...state.hero,
+      unlockedSkills: ['geirskogul' as const],
+      passives: ['bloodOfDragon' as const],
+    };
+    const jumped = useSkill({ ...state, hero }, 'jump', target);
+    expect(jumped.hero.buffs).toContainEqual({ type: 'dragonEye', stacks: 1 });
+
+    const directionTarget = [
+      { x: jumped.hero.x + 1, y: jumped.hero.y },
+      { x: jumped.hero.x - 1, y: jumped.hero.y },
+      { x: jumped.hero.x, y: jumped.hero.y + 1 },
+      { x: jumped.hero.x, y: jumped.hero.y - 1 },
+    ].find((cell) => isPassable(jumped.floor, cell.x, cell.y));
+    if (!directionTarget) throw new Error('test map has no Geirskogul direction');
+    const enemy = { ...createNewGame(9).floor.enemies[0]!, x: directionTarget.x, y: directionTarget.y, hp: 999, maxHp: 999 };
+    const lineState = {
+      ...jumped,
+      hero: { ...jumped.hero, mp: 100, unlockedSkills: ['geirskogul' as const] },
+      floor: { ...jumped.floor, enemies: [enemy] },
+    };
+    const fired = useSkill(lineState, 'geirskogul', directionTarget);
+    expect(fired.hero.buffs.some((buff) => buff.type === 'dragonEye')).toBe(false);
+    expect(fired.floor.enemies[0]!.hp).toBeLessThan(enemy.hp);
+  });
+
+  it('跳跃精通使非跳跃技能缩短跳跃系技能冷却 2 回合', () => {
+    const state = createNewGame(10);
+    const hero = {
+      ...state.hero,
+      unlockedSkills: ['lifeSurge' as const],
+      passives: ['jumpMastery' as const],
+      skillCooldowns: { ...state.hero.skillCooldowns, jump: 5, elusiveJump: 8 },
+    };
+    const next = useSkill({ ...state, hero }, 'lifeSurge', { x: hero.x, y: hero.y });
+    expect(next.hero.skillCooldowns).toMatchObject({ jump: 3, elusiveJump: 6 });
   });
 });

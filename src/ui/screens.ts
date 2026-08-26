@@ -3,7 +3,9 @@ import { experienceRequiredForLevel, heroAtk, mpRegenPerTurn } from '@/game/stat
 import { getJobDefinition, type JobId } from '@/data/jobs';
 import { renderLog } from '@/ui/log';
 import { renderInventory } from '@/ui/inventory';
-import { SKILL_DEFINITIONS } from '@/data/skills';
+import { activeSkillIds, SKILL_DEFINITIONS } from '@/data/skills';
+import { PASSIVE_DEFINITIONS } from '@/data/passives';
+import { LEVEL_UP_REWARDS } from '@/data/level-rewards';
 import { MAX_ACTIVE_SKILLS, skillIconPath } from '@/config';
 import type { SkillId } from '@/game/state';
 
@@ -42,6 +44,7 @@ export interface UIHandles {
   confirmJobBtn: HTMLButtonElement;
   attributesToggle: HTMLButtonElement;
   attributesPanel: HTMLElement;
+  passiveInfo: HTMLElement;
 }
 
 export function bindUI(): UIHandles {
@@ -80,6 +83,7 @@ export function bindUI(): UIHandles {
     confirmJobBtn: el('confirm-job-btn') as HTMLButtonElement,
     attributesToggle: el('attributes-toggle') as HTMLButtonElement,
     attributesPanel: el('attribute-panel'),
+    passiveInfo: el('passive-info'),
   };
 }
 
@@ -161,6 +165,12 @@ export function updateHUD(ui: UIHandles, state: GameState): void {
     ['Gil', state.hero.gil],
     ['本局击杀', state.stats.kills],
   ].map(([label, value]) => `<div class="derived-cell"><span>${label}</span><strong>${value}</strong></div>`).join('');
+  ui.passiveInfo.innerHTML = state.hero.passives.length === 0
+    ? '<span class="passive-empty">尚未获得被动技能</span>'
+    : state.hero.passives.map((passiveId) => {
+      const passive = PASSIVE_DEFINITIONS[passiveId];
+      return `<div class="passive-card"><strong>${passive.name}<small>${passive.englishName}</small></strong><span>${passive.description}</span></div>`;
+    }).join('');
   renderLog(ui.logPanel, state.log);
 }
 
@@ -208,8 +218,7 @@ export function updateScreens(
   ui.bagBtn.classList.toggle('hidden', !state || (phase !== 'playing' && phase !== 'inventory'));
   ui.skillDock.classList.toggle('hidden', !state);
   if (state) {
-    const job = getJobDefinition(state.hero.jobId);
-    const skillIds = (job?.skills ?? []).slice(0, MAX_ACTIVE_SKILLS);
+    const skillIds = activeSkillIds(state.hero).slice(0, MAX_ACTIVE_SKILLS);
     ui.skillSlotCount.textContent = `${skillIds.length}/${MAX_ACTIVE_SKILLS}`;
     ui.skillBar.innerHTML = Array.from({ length: MAX_ACTIVE_SKILLS }, (_, index) => {
       const skillId = skillIds[index];
@@ -219,7 +228,7 @@ export function updateScreens(
       const skill = SKILL_DEFINITIONS[skillId];
       const cooldown = state.hero.skillCooldowns[skillId];
       const disabled = phase !== 'playing' || state.hero.mp < skill.mpCost || cooldown > 0;
-      return `<button class="skill-button" type="button" data-skill="${skillId}" ${disabled ? 'disabled' : ''} title="${skill.name}：消耗 ${skill.mpCost} MP，冷却 ${skill.cooldownTurns} 回合"><span class="skill-slot-number">${index + 1}</span><img src="${skillIconPath(skillId)}" alt="" onerror="this.hidden=true"><span class="skill-name">${skill.name}</span><span class="skill-meta"><small class="skill-cost">MP ${skill.mpCost}</small>${cooldown > 0 ? `<small class="skill-cooldown">CD ${cooldown}</small>` : ''}</span></button>`;
+      return `<button class="skill-button" type="button" data-skill="${skillId}" ${disabled ? 'disabled' : ''} title="${skill.name} / ${skill.englishName}：消耗 ${skill.mpCost} MP，冷却 ${skill.cooldownTurns} 回合"><span class="skill-slot-number">${index + 1}</span><img src="${skillIconPath(skillId)}" alt="" onerror="this.hidden=true"><span class="skill-name">${skill.name}</span><small class="skill-english">${skill.englishName}</small><span class="skill-meta"><small class="skill-cost">MP ${skill.mpCost}</small>${cooldown > 0 ? `<small class="skill-cooldown">CD ${cooldown}</small>` : ''}</span></button>`;
     }).join('');
     ui.skillBar.querySelectorAll<HTMLButtonElement>('[data-skill]').forEach((button) => {
       button.addEventListener('click', () => opts.onSelectSkill(button.dataset.skill as SkillId));
@@ -231,14 +240,9 @@ export function updateScreens(
   }
 
   if (state && phase === 'levelUp') {
-    const labels: Record<LevelUpRewardId, [string, string]> = {
-      attack: ['攻击强化', `主属性 ${state.hero.attributes[getJobDefinition(state.hero.jobId)?.primaryAttribute ?? 'strength']} → 1.3 倍`],
-      survival: ['生存强化', `坚韧 ${state.hero.attributes.tenacity} → 1.3 倍`],
-      critical: ['暴击强化', `暴击 ${state.hero.attributes.criticalHit} → 1.3 倍`],
-    };
     ui.levelUpOptions.innerHTML = state.levelUpRewards.map((reward) => {
-      const [name, effect] = labels[reward];
-      return `<button class="level-up-option" type="button" data-reward="${reward}"><strong>${name}</strong><span>${effect}</span></button>`;
+      const definition = LEVEL_UP_REWARDS[reward];
+      return `<button class="level-up-option" type="button" data-reward="${reward}"><strong>${definition.name}${definition.englishName ? `<small class="reward-english">${definition.englishName}</small>` : ''}</strong><span>${definition.description}</span></button>`;
     }).join('');
     ui.levelUpOptions.querySelectorAll<HTMLButtonElement>('[data-reward]').forEach((button) => {
       button.addEventListener('click', () => opts.onChooseLevelReward(button.dataset.reward as LevelUpRewardId));

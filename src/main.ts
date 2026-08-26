@@ -11,7 +11,8 @@ import { findPath } from '@/world/pathfinding';
 import { GameRenderer } from '@/render/app';
 import { bindUI, setAttributesPanelOpen, updateJobSelection, updateScreens } from '@/ui/screens';
 import { deleteSave, loadGame, saveGame } from '@/save/save';
-import { canTargetJump } from '@/systems/skills';
+import { canTargetGeirskogul, canTargetJump } from '@/systems/skills';
+import { SKILL_DEFINITIONS } from '@/data/skills';
 
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
 const ui = bindUI();
@@ -44,6 +45,7 @@ function refresh(): void {
     ui.deathScreen.classList.add('hidden');
     ui.invOverlay.classList.add('hidden');
     ui.bagBtn.classList.add('hidden');
+    ui.skillDock.classList.add('hidden');
     ui.continueBtn.classList.toggle('hidden', !saveExists());
     return;
   }
@@ -56,7 +58,7 @@ function refresh(): void {
     onSelectSkill: startSkillTargeting,
   });
   renderer.render(state);
-  if (targetingSkill === 'jump') renderer.setJumpTargeting(true, state);
+  if (targetingSkill === 'jump' || targetingSkill === 'geirskogul') renderer.setJumpTargeting(true, state);
 }
 
 function startNewGame(jobId = selectedJob): void {
@@ -129,6 +131,10 @@ function dispatch(action: PlayerAction, fromAutoPath = false): void {
 
 function startSkillTargeting(skillId: SkillId): void {
   if (!state || state.phase !== 'playing' || animationLocked) return;
+  if (SKILL_DEFINITIONS[skillId].targeting === 'self') {
+    dispatch({ type: 'useSkill', skillId, x: state.hero.x, y: state.hero.y });
+    return;
+  }
   targetingSkill = skillId;
   cancelAutoPath();
   refresh();
@@ -201,13 +207,17 @@ function handleMapPointer(event: PointerEvent): void {
   const tile = tileFromPointer(event);
   if (!tile) return;
 
-  if (targetingSkill === 'jump') {
-    if (!canTargetJump(state, tile)) return;
+  if (targetingSkill === 'jump' || targetingSkill === 'geirskogul') {
+    const valid = targetingSkill === 'jump'
+      ? canTargetJump(state, tile)
+      : canTargetGeirskogul(state, tile);
+    if (!valid) return;
+    const skillId = targetingSkill;
     targetingSkill = null;
     const before = state;
-    dispatch({ type: 'useSkill', skillId: 'jump', x: tile.x, y: tile.y });
+    dispatch({ type: 'useSkill', skillId, x: tile.x, y: tile.y });
     if (state === before) {
-      targetingSkill = 'jump';
+      targetingSkill = skillId;
       refresh();
     }
     return;

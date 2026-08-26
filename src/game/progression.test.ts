@@ -43,21 +43,76 @@ describe('角色成长', () => {
     const attributes = { ...createNewGame(1).hero.attributes, tenacity: 50, piety: 500 };
     expect(maxHpForAttributes(attributes)).toBe(25);
     expect(mpRegenPerTurn(attributes)).toBe(6);
+    expect(mpRegenPerTurn(attributes)).toBe(6);
     expect(mpCostAfterPiety(10, attributes)).toBe(5);
   });
 
-  it('升级奖励随机展示三项，并按选择永久强化对应属性', () => {
-    expect(new Set(rollLevelUpRewards())).toEqual(new Set(['attack', 'survival', 'critical']));
-    const levelUpRewards: LevelUpRewardId[] = ['attack', 'survival', 'critical'];
+  it('升级奖励按权重无放回展示三项，并按选择永久强化对应属性', () => {
+    const offered = rollLevelUpRewards();
+    expect(offered).toHaveLength(3);
+    expect(new Set(offered).size).toBe(3);
+    const levelUpRewards: LevelUpRewardId[] = ['maxHp', 'primaryAttribute', 'maxMp'];
     const state = {
       ...createNewGame(1),
       phase: 'levelUp' as const,
       pendingLevelRewards: 1,
       levelUpRewards,
     };
-    expect(applyLevelUpReward(state, 'attack').hero.attributes.strength).toBe(16);
-    expect(applyLevelUpReward(state, 'survival').hero.attributes.tenacity).toBe(65);
-    expect(applyLevelUpReward(state, 'critical').hero.attributes.criticalHit).toBe(130);
+    expect(applyLevelUpReward(state, 'maxHp').hero.maxHp).toBe(65);
+    expect(applyLevelUpReward(state, 'primaryAttribute').hero.attributes.strength).toBe(14);
+    expect(applyLevelUpReward(state, 'maxMp').hero.maxMp).toBe(130);
+  });
+
+  it('权重决定候选出现概率，一次性奖励领取后不再出现，可重复属性可继续领取', () => {
+    const hero = createNewGame(1).hero;
+    const weightedHero = {
+      ...hero,
+      rewardWeights: {
+        ...hero.rewardWeights,
+        ...Object.fromEntries(Object.keys(hero.rewardWeights).map((reward) => [reward, 0])),
+        maxHp: 1,
+        primaryAttribute: 1,
+        maxMp: 1,
+      },
+    };
+    expect(new Set(rollLevelUpRewards(weightedHero))).toEqual(new Set(['maxHp', 'primaryAttribute', 'maxMp']));
+
+    const oneTimeState = {
+      ...createNewGame(1),
+      phase: 'levelUp' as const,
+      pendingLevelRewards: 2,
+      levelUpRewards: ['lifeSurge', 'maxHp', 'maxMp'] as LevelUpRewardId[],
+    };
+    const learned = applyLevelUpReward(oneTimeState, 'lifeSurge');
+    expect(learned.hero.unlockedSkills).toContain('lifeSurge');
+    expect(learned.hero.claimedLevelRewards).toContain('lifeSurge');
+    expect(rollLevelUpRewards(learned.hero)).not.toContain('lifeSurge');
+
+    const repeatState = {
+      ...createNewGame(1),
+      phase: 'levelUp' as const,
+      pendingLevelRewards: 1,
+      levelUpRewards: ['maxHp', 'primaryAttribute', 'maxMp'] as LevelUpRewardId[],
+    };
+    const repeated = applyLevelUpReward(repeatState, 'maxHp');
+    expect(repeated.hero.maxHp).toBe(65);
+    expect(repeated.hero.claimedLevelRewards).not.toContain('maxHp');
+  });
+
+  it('龙骑士被动按表格前置解锁，苍天龙血需要先获得武神枪', () => {
+    const initial = rollLevelUpRewards(createNewGame(1).hero);
+    expect(initial).not.toContain('bloodOfDragon');
+
+    const afterGeirskogul = {
+      ...createNewGame(1).hero,
+      claimedLevelRewards: ['geirskogul'] as LevelUpRewardId[],
+      rewardWeights: {
+        ...createNewGame(1).hero.rewardWeights,
+        ...Object.fromEntries(Object.keys(createNewGame(1).hero.rewardWeights).map((reward) => [reward, 0])),
+        bloodOfDragon: 1,
+      },
+    };
+    expect(rollLevelUpRewards(afterGeirskogul)).toContain('bloodOfDragon');
   });
 
   it('选择升级奖励不消耗回合，并恢复游戏', () => {
@@ -65,9 +120,9 @@ describe('角色成长', () => {
       ...createNewGame(1),
       phase: 'levelUp' as const,
       pendingLevelRewards: 1,
-      levelUpRewards: ['attack', 'survival', 'critical'] as LevelUpRewardId[],
+      levelUpRewards: ['maxHp', 'primaryAttribute', 'maxMp'] as LevelUpRewardId[],
     };
-    const next = processTurn(state, { type: 'chooseLevelReward', reward: 'attack' });
+    const next = processTurn(state, { type: 'chooseLevelReward', reward: 'maxHp' });
     expect(next).toMatchObject({ phase: 'playing', turn: state.turn, pendingLevelRewards: 0 });
   });
 });

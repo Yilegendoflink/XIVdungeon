@@ -1,4 +1,5 @@
 import { MAP_W, MAP_H, MAX_LEVEL } from '@/config';
+import { LEVEL_UP_REWARDS, rewardPoolForJob } from '@/data/level-rewards';
 import type { TileKind, VisibilityKind } from '@/config';
 
 export type GamePhase = 'title' | 'playing' | 'inventory' | 'levelUp' | 'dead' | 'victory';
@@ -8,10 +9,22 @@ export type EnemyAiState = 'free' | 'aggro';
 export type ItemType = 'hiPotion' | 'scrollOfMight' | 'gridanianRation';
 export type FloorObjectiveType = 'findExit' | 'defeatCount' | 'defeatSpecial' | 'finalBoss';
 export type BaseAttribute = 'strength' | 'dexterity' | 'intelligence';
-export type SkillId = 'jump';
-export type LevelUpRewardId = 'attack' | 'survival' | 'critical';
+export type SkillId = 'jump' | 'lifeSurge' | 'geirskogul' | 'elusiveJump' | 'dragonSight';
+export type PassiveId = 'bloodOfDragon' | 'jumpMastery' | 'bloodbath';
+export type LevelUpRewardId =
+  | 'maxHp' | 'primaryAttribute' | 'maxMp' | 'gil'
+  | 'survival' | 'offense' | 'healing' | 'critical'
+  | 'lifeSurge' | 'geirskogul' | 'elusiveJump' | 'dragonSight'
+  | 'bloodOfDragon' | 'jumpMastery' | 'bloodbath';
 
-export const LEVEL_UP_REWARD_IDS: LevelUpRewardId[] = ['attack', 'survival', 'critical'];
+export const LEVEL_UP_REWARD_IDS: LevelUpRewardId[] = [
+  'maxHp', 'primaryAttribute', 'maxMp', 'gil', 'survival', 'offense', 'healing', 'critical',
+  'lifeSurge', 'geirskogul', 'elusiveJump', 'dragonSight', 'bloodOfDragon', 'jumpMastery', 'bloodbath',
+];
+
+export function defaultRewardWeights(): Record<LevelUpRewardId, number> {
+  return Object.fromEntries(LEVEL_UP_REWARD_IDS.map((reward) => [reward, LEVEL_UP_REWARDS[reward].weight])) as Record<LevelUpRewardId, number>;
+}
 
 export interface StaticAttributes {
   strength: number;
@@ -44,11 +57,11 @@ export interface FloorObjectiveState {
   label: string;
 }
 
-export interface BuffState {
-  type: 'might';
-  value: number;
-  turnsLeft: number;
-}
+export type BuffState =
+  | { type: 'might'; value: number; turnsLeft: number }
+  | { type: 'lifeSurge'; turnsLeft: number }
+  | { type: 'dragonSight'; turnsLeft: number }
+  | { type: 'dragonEye'; stacks: number; turnsLeft?: never };
 
 export interface JobResourceState {
   id: string;
@@ -123,6 +136,11 @@ export interface HeroState {
   experience: number;
   attributes: StaticAttributes;
   skillCooldowns: Record<SkillId, number>;
+  unlockedSkills: SkillId[];
+  passives: PassiveId[];
+  claimedLevelRewards: LevelUpRewardId[];
+  rewardWeights: Record<LevelUpRewardId, number>;
+  lastDirection?: { dx: number; dy: number };
   def: number;
   inventory: ItemState[];
   buffs: BuffState[];
@@ -216,13 +234,34 @@ export function gainExperience(hero: HeroState, amount: number): { hero: HeroSta
   };
 }
 
-export function rollLevelUpRewards(): LevelUpRewardId[] {
-  const rewards = [...LEVEL_UP_REWARD_IDS];
-  for (let index = rewards.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
-    [rewards[index], rewards[swapIndex]] = [rewards[swapIndex]!, rewards[index]!];
+export function rollLevelUpRewards(
+  hero?: Pick<HeroState, 'claimedLevelRewards' | 'rewardWeights'>,
+  jobId = 'dragoon',
+): LevelUpRewardId[] {
+  const claimed = new Set(hero?.claimedLevelRewards ?? []);
+  const candidates = rewardPoolForJob(jobId).filter((reward) => {
+    const definition = LEVEL_UP_REWARDS[reward];
+    return (definition.repeatable || !claimed.has(reward)) &&
+      (definition.requires ?? []).every((required) => claimed.has(required));
+  });
+  const weights = hero?.rewardWeights ?? defaultRewardWeights();
+  const picked: LevelUpRewardId[] = [];
+
+  while (picked.length < 3 && candidates.length > 0) {
+    const weightFor = (reward: LevelUpRewardId): number => Math.max(0, weights[reward] ?? LEVEL_UP_REWARDS[reward].weight);
+    const total = candidates.reduce((sum, reward) => sum + weightFor(reward), 0);
+    if (total <= 0) {
+      picked.push(candidates.shift()!);
+      continue;
+    }
+    let roll = Math.random() * total;
+    const index = candidates.findIndex((reward) => {
+      roll -= weightFor(reward);
+      return roll < 0;
+    });
+    picked.push(candidates.splice(index < 0 ? candidates.length - 1 : index, 1)[0]!);
   }
-  return rewards;
+  return picked;
 }
 
 export function maxHpForAttributes(attributes: StaticAttributes): number {
