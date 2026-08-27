@@ -1,4 +1,4 @@
-import type { GameModifiers, GameState, LevelUpRewardId } from '@/game/state';
+import type { BuffState, DebuffState, GameModifiers, GameState, LevelUpRewardId } from '@/game/state';
 import { experienceRequiredForLevel, heroAtk, mpRegenPerTurn } from '@/game/state';
 import { getJobDefinition, type JobId } from '@/data/jobs';
 import { renderLog } from '@/ui/log';
@@ -20,6 +20,7 @@ export interface UIHandles {
   derivedInfo: HTMLElement;
   resourceInfo: HTMLElement;
   gilInfo: HTMLElement;
+  statusEffects: HTMLElement;
   floorInfo: HTMLElement;
   objectiveInfo: HTMLElement;
   modifierInfo: HTMLElement;
@@ -59,6 +60,7 @@ export function bindUI(): UIHandles {
     derivedInfo: el('derived-info'),
     resourceInfo: el('resource-info'),
     gilInfo: el('gil-info'),
+    statusEffects: el('status-effects'),
     floorInfo: el('floor-info'),
     objectiveInfo: el('objective-info'),
     modifierInfo: el('modifier-info'),
@@ -91,6 +93,52 @@ function el(id: string): HTMLElement {
   const node = document.getElementById(id);
   if (!node) throw new Error(`Missing #${id}`);
   return node;
+}
+
+interface StatusDisplay {
+  kind: 'buff' | 'debuff';
+  name: string;
+  detail: string;
+  counter?: string;
+}
+
+function describeBuff(buff: BuffState): StatusDisplay {
+  switch (buff.type) {
+    case 'might':
+      return { kind: 'buff', name: '力量提升', detail: `攻击 +${buff.value}`, counter: `${buff.turnsLeft}回合` };
+    case 'lifeSurge':
+      return { kind: 'buff', name: '龙剑', detail: '下次伤害必定暴击', counter: `${buff.turnsLeft}回合` };
+    case 'dragonSight':
+      return { kind: 'buff', name: '巨龙视线', detail: '伤害 +100%', counter: `${buff.turnsLeft}回合` };
+    case 'dragonEye':
+      return { kind: 'buff', name: '龙眼', detail: '强化武神枪', counter: `${buff.stacks}层` };
+  }
+}
+
+function describeDebuff(debuff: DebuffState): StatusDisplay {
+  const detail = [
+    debuff.detail ?? '负面效果',
+    debuff.stacks === undefined ? '' : `${debuff.stacks}层`,
+  ].filter(Boolean).join(' · ');
+  return {
+    kind: 'debuff',
+    name: debuff.name,
+    detail,
+    counter: debuff.turnsLeft === undefined ? undefined : `${debuff.turnsLeft}回合`,
+  };
+}
+
+function renderStatusEffects(ui: UIHandles, state: GameState): void {
+  const effects = [
+    ...state.hero.buffs.map(describeBuff),
+    ...(state.hero.debuffs ?? []).map(describeDebuff),
+  ];
+  ui.statusEffects.innerHTML = effects.length === 0
+    ? '<span class="status-empty">无 Buff / Debuff</span>'
+    : effects.map((effect) => {
+      const counter = effect.counter ? `<small>${effect.counter}</small>` : '';
+      return `<span class="status-pill ${effect.kind}" title="${effect.name}：${effect.detail}${effect.counter ? `，${effect.counter}` : ''}"><b>${effect.kind === 'buff' ? '增' : '减'}</b><span>${effect.name}</span>${counter}</span>`;
+    }).join('');
 }
 
 export function updateHUD(ui: UIHandles, state: GameState): void {
@@ -165,6 +213,7 @@ export function updateHUD(ui: UIHandles, state: GameState): void {
     ['Gil', state.hero.gil],
     ['本局击杀', state.stats.kills],
   ].map(([label, value]) => `<div class="derived-cell"><span>${label}</span><strong>${value}</strong></div>`).join('');
+  renderStatusEffects(ui, state);
   ui.passiveInfo.innerHTML = state.hero.passives.length === 0
     ? '<span class="passive-empty">尚未获得被动技能</span>'
     : state.hero.passives.map((passiveId) => {

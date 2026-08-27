@@ -63,6 +63,14 @@ export type BuffState =
   | { type: 'dragonSight'; turnsLeft: number }
   | { type: 'dragonEye'; stacks: number; turnsLeft?: never };
 
+export interface DebuffState {
+  type: string;
+  name: string;
+  detail?: string;
+  turnsLeft?: number;
+  stacks?: number;
+}
+
 export interface JobResourceState {
   id: string;
   name: string;
@@ -144,6 +152,7 @@ export interface HeroState {
   def: number;
   inventory: ItemState[];
   buffs: BuffState[];
+  debuffs?: DebuffState[];
 }
 
 export interface FloorState {

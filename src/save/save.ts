@@ -185,6 +185,13 @@ function isValidBuff(value: unknown): boolean {
     : value.type === 'lifeSurge' || value.type === 'dragonSight';
 }
 
+function isValidDebuff(value: unknown): boolean {
+  if (!isRecord(value) || typeof value.type !== 'string' || typeof value.name !== 'string') return false;
+  return (value.detail === undefined || typeof value.detail === 'string') &&
+    (value.turnsLeft === undefined || isPositiveInteger(value.turnsLeft)) &&
+    (value.stacks === undefined || isPositiveInteger(value.stacks));
+}
+
 function isValidJobResource(value: unknown): boolean {
   if (!isRecord(value)) return false;
   return (
@@ -325,7 +332,8 @@ function isValidState(state: unknown): state is GameState {
     !Array.isArray(hero.inventory) ||
     !hero.inventory.every(isValidItem) ||
     !Array.isArray(hero.buffs) ||
-    !hero.buffs.every(isValidBuff)
+    !hero.buffs.every(isValidBuff) ||
+    (hero.debuffs !== undefined && (!Array.isArray(hero.debuffs) || !hero.debuffs.every(isValidDebuff)))
   ) {
     return false;
   }

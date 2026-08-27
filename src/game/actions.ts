@@ -83,6 +83,7 @@ export function createNewGame(
       def: 2,
       inventory: [],
       buffs: [],
+      debuffs: [],
     },
     floor,
     damageEventSequence: 0,

@@ -83,7 +83,7 @@ body {
 }
 
 #run-hud {
-  min-height: 100%;
+  min-height: 0;
   padding: 12px 14px;
 }
 
@@ -193,7 +193,8 @@ body {
 }
 
 #resource-info {
-  flex: 1 1 100%;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .job-resource-list {
@@ -232,6 +233,83 @@ body {
 }
 
 .resource-empty {
+  color: var(--dim);
+  font-size: 10px;
+}
+
+.status-effects {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 22px;
+  margin-top: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.status-effects::-webkit-scrollbar {
+  display: none;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  max-width: 170px;
+  min-height: 22px;
+  padding: 3px 6px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.status-pill b {
+  display: inline-grid;
+  width: 15px;
+  height: 15px;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 9px;
+}
+
+.status-pill span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-pill small {
+  color: var(--dim);
+  font-family: Consolas, monospace;
+  font-size: 9px;
+}
+
+.status-pill.buff {
+  background: rgba(86, 139, 104, 0.16);
+  border-color: #47785d;
+  color: #b8e5bf;
+}
+
+.status-pill.buff b {
+  background: #47785d;
+  color: #102217;
+}
+
+.status-pill.debuff {
+  background: rgba(188, 79, 88, 0.16);
+  border-color: #9a4d58;
+  color: #ffc0c2;
+}
+
+.status-pill.debuff b {
+  background: #9a4d58;
+  color: #2a1014;
+}
+
+.status-empty {
   color: var(--dim);
   font-size: 10px;
 }
@@ -806,9 +884,9 @@ body {
 
 @media (max-width: 720px) {
   #hud {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(112px, 0.75fr);
+    align-items: start;
     top: 6px;
     left: 6px;
     right: 6px;
@@ -817,7 +895,8 @@ body {
 
   #player-hud,
   #run-hud {
-    width: min(286px, calc(100vw - 12px));
+    width: auto;
+    min-width: 0;
   }
 
   #player-hud {
@@ -839,6 +918,46 @@ body {
 
   .resource-footer {
     margin-top: 7px;
+  }
+
+  .resource-track {
+    height: 12px;
+  }
+
+  .resource-mini-label {
+    font-size: 9px;
+  }
+
+  .resource-mini-track {
+    height: 5px;
+  }
+
+  .status-effects {
+    margin-top: 6px;
+  }
+
+  .status-pill {
+    min-height: 21px;
+    padding-inline: 5px;
+    font-size: 9px;
+  }
+
+  .run-heading strong {
+    font-size: 13px;
+  }
+
+  #run-hud .objective-line {
+    max-height: 3.3em;
+    margin-top: 8px;
+    overflow: hidden;
+    font-size: 11px;
+  }
+
+  #run-hud .modifier-line {
+    max-height: 2.8em;
+    margin-top: 6px;
+    overflow: hidden;
+    font-size: 9px;
   }
 
   #skill-dock {
@@ -867,8 +986,8 @@ body {
   }
 
   #attribute-panel {
-    top: 174px;
-    bottom: max(96px, calc(env(safe-area-inset-bottom) + 88px));
+    top: 142px;
+    bottom: max(124px, calc(env(safe-area-inset-bottom) + 116px));
     right: 6px;
     width: min(360px, calc(100% - 12px));
     max-height: none;
@@ -900,10 +1019,10 @@ body {
   }
 
   #log-panel {
-    bottom: max(78px, calc(env(safe-area-inset-bottom) + 72px));
+    bottom: max(124px, calc(env(safe-area-inset-bottom) + 116px));
     left: 6px;
-    width: min(290px, calc(100% - 12px));
-    max-height: 58px;
+    width: calc(100% - 12px);
+    max-height: 50px;
     font-size: 11px;
   }
 }
